@@ -340,6 +340,12 @@ export default function App() {
     if (detailRecipe?.id === id) setDetailRecipe(null)
   }
 
+  const deleteHistory = id => {
+    if (!window.confirm("この履歴を削除しますか？")) return
+    const next = history.filter(h => h.id !== id)
+    setHistory(next); triggerSave(buildSave({ history: next }))
+  }
+
   // ── プラン操作 ──
   const sortedEntries = useMemo(() => [...planEntries].sort((a, b) => (a.date || "").localeCompare(b.date || "")), [planEntries])
 
@@ -642,8 +648,9 @@ export default function App() {
                     <div style={{ fontWeight: 700, fontSize: 14 }}>{week.label}</div>
                     <div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>{week.menus.length}日分</div>
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={e => { e.stopPropagation(); setEditingHistory(week) }}>✏️ 編集</button>
+                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: "#c0391b" }} onClick={e => { e.stopPropagation(); deleteHistory(week.id) }}>🗑 削除</button>
                     <span style={{ color: "#8a7050" }}>{expandedHistory === week.id ? "▲" : "▼"}</span>
                   </div>
                 </div>
@@ -725,6 +732,8 @@ function RegisterSheet({ recipe, onSave, onClose }) {
   const [form, setForm] = useState(() => { if (!recipe) return blank; const r = JSON.parse(JSON.stringify(recipe)); if (!r.steps) r.steps = [""]; return r })
   const [regTab, setRegTab] = useState("basic")
   const [aiUrl, setAiUrl] = useState("")
+  const [aiText, setAiText] = useState("")
+  const [aiMode, setAiMode] = useState("url") // url | text
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState("")
 
@@ -738,25 +747,29 @@ function RegisterSheet({ recipe, onSave, onClose }) {
   const tabStyle = id => ({ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: regTab === id ? "#3d2b08" : "#b09070", borderBottom: regTab === id ? "2px solid #3d2b08" : "2px solid transparent", transition: "all .15s" })
 
   const handleAiExtract = async () => {
-    if (!aiUrl.trim()) return
+    const input = aiMode === "url" ? aiUrl.trim() : aiText.trim()
+    if (!input) return
     setAiLoading(true); setAiError("")
     try {
-      const result = await extractRecipeFromUrl(aiUrl.trim())
+      const result = aiMode === "url"
+        ? await extractRecipeFromUrl(input)
+        : await extractRecipeFromText(input)
       setForm({
         name: result.recipeName || "",
         tag: "主菜", favorite: false,
         memo: result.memo || "",
-        url: aiUrl.trim(),
+        url: aiMode === "url" ? input : "",
         steps: result.steps?.length ? result.steps : [""],
-        ingredients: result.ingredients?.map(ing => ({
-          name: ing.name || "", amount: ing.amount || "", unit: ing.unit || "g",
-          type: ing.type || "通常食材", category: ing.category || "野菜・果物"
-        })) || [],
+        ingredients: (result.ingredients || []).map(ing => ({
+          name: ing.name || "", amount: ing.amount ?? "",
+          unit: ing.unit || "g", type: ing.type || "通常食材",
+          category: ing.category || "野菜・果物"
+        })),
         aiGenerated: true,
       })
       setRegTab("basic")
     } catch (e) {
-      setAiError("抽出に失敗しました。URLを確認するか、手動で入力してください。\n" + e.message)
+      setAiError(e.message)
     }
     setAiLoading(false)
   }
@@ -772,17 +785,35 @@ function RegisterSheet({ recipe, onSave, onClose }) {
         {/* AI自動入力エリア */}
         {!recipe && (
           <div style={{ background: "linear-gradient(135deg,#eef2ff,#f5f3ff)", border: "1.5px solid #c7d2fe", borderRadius: 12, padding: "14px 16px", marginBottom: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <span className="ai-badge">✨ AI</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#4338ca" }}>URLからレシピを自動入力</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#4338ca" }}>レシピを自動入力</span>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input placeholder="YouTubeやレシピサイトのURLを貼り付け" value={aiUrl} onChange={e => setAiUrl(e.target.value)} style={{ flex: 1, fontSize: 13, padding: "8px 10px", borderColor: "#c7d2fe" }} />
-              <button className="btn btn-primary btn-sm" style={{ background: "#4f46e5", whiteSpace: "nowrap" }} onClick={handleAiExtract} disabled={aiLoading}>
-                {aiLoading ? <span className="spinner-sm" /> : "解析"}
-              </button>
+            {/* モード切替 */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+              <button onClick={() => setAiMode("url")} className="pill-btn" style={{ fontSize: 11, padding: "4px 12px", background: aiMode === "url" ? "#4f46e5" : "#fff", color: aiMode === "url" ? "#fff" : "#5a4020", borderColor: aiMode === "url" ? "#4f46e5" : "#d4c5b0" }}>URLから</button>
+              <button onClick={() => setAiMode("text")} className="pill-btn" style={{ fontSize: 11, padding: "4px 12px", background: aiMode === "text" ? "#4f46e5" : "#fff", color: aiMode === "text" ? "#fff" : "#5a4020", borderColor: aiMode === "text" ? "#4f46e5" : "#d4c5b0" }}>テキストを貼り付け</button>
             </div>
-            {aiError && <div style={{ fontSize: 11, color: "#c0391b", marginTop: 8 }}>{aiError}</div>}
+            {aiMode === "url" ? (
+              <div>
+                <div style={{ fontSize: 11, color: "#6366f1", marginBottom: 6 }}>※ クックパッド・デリッシュ等のレシピサイトが対象。YouTubeはタイトルのみ解析します</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input placeholder="https://cookpad.com/recipe/..." value={aiUrl} onChange={e => setAiUrl(e.target.value)} style={{ flex: 1, fontSize: 13, padding: "8px 10px", borderColor: "#c7d2fe" }} />
+                  <button className="btn btn-primary btn-sm" style={{ background: "#4f46e5", whiteSpace: "nowrap" }} onClick={handleAiExtract} disabled={aiLoading}>
+                    {aiLoading ? <span className="spinner-sm" /> : "解析"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: 11, color: "#6366f1", marginBottom: 6 }}>レシピページのテキストをコピーして貼り付けてください</div>
+                <textarea rows={4} placeholder="材料&#10;・鶏もも肉 300g&#10;・醤油 大さじ2&#10;&#10;作り方&#10;1. ..." value={aiText} onChange={e => setAiText(e.target.value)} style={{ fontSize: 12, padding: "8px 10px", borderColor: "#c7d2fe", resize: "vertical", marginBottom: 8 }} />
+                <button className="btn btn-primary btn-sm" style={{ background: "#4f46e5", width: "100%", padding: "10px" }} onClick={handleAiExtract} disabled={aiLoading}>
+                  {aiLoading ? <><span className="spinner-sm" /> 解析中...</> : "✨ AIで解析する"}
+                </button>
+              </div>
+            )}
+            {aiError && <div style={{ fontSize: 11, color: "#c0391b", marginTop: 8, padding: "8px", background: "#fff0ee", borderRadius: 6 }}>⚠️ {aiError}</div>}
           </div>
         )}
 
