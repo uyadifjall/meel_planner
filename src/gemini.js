@@ -1,7 +1,7 @@
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
 
 // モデルとヘッダー形式をcurlコマンドに合わせて修正
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 const SYSTEM_PROMPT = `あなたはレシピ解析AIです。与えられた情報からレシピを抽出し、必ず以下の純粋なJSONのみを返してください。前置きや説明文、マークダウンの\`\`\`は一切不要です。JSONだけを返してください。
 
