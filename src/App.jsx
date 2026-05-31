@@ -1,7 +1,6 @@
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { hashPassword, getUser, createUser, saveData } from "./supabase.js"
 
-// ─────────────── 定数 ───────────────
 const TAGS = ["主菜", "副菜", "お弁当"]
 const STORE_ORDER = ["野菜・果物","肉・魚","卵・乳製品","加工食品・大豆製品","乾物・麺類・パスタ","調味料","冷凍食品・その他"]
 const DAYS = ["月","火","水","木","金","土","日"]
@@ -10,12 +9,7 @@ const SAMPLE_RECIPES = [
   { id: 1, name: "肉じゃが", tag: "主菜", favorite: true,
     memo: "じゃがいもはほくほくになるまで煮る。牛肉は最初に炒めてから。",
     url: "https://www.youtube.com/results?search_query=肉じゃが+レシピ",
-    steps: [
-      "牛肉を一口大に切り、サラダ油で炒める。",
-      "じゃがいも・玉ねぎ・にんじんを加えてさらに炒める。",
-      "水200mlと砂糖・醤油・みりんを加え、落し蓋をして中火で15分煮る。",
-      "じゃがいもに箸が通ったら完成。"
-    ],
+    steps: ["牛肉を一口大に切り、サラダ油で炒める。","じゃがいも・玉ねぎ・にんじんを加えてさらに炒める。","水200mlと砂糖・醤油・みりんを加え、落し蓋をして中火で15分煮る。","じゃがいもに箸が通ったら完成。"],
     ingredients: [
       { name: "牛薄切り肉", amount: 150, unit: "g", type: "通常食材", category: "肉・魚" },
       { name: "じゃがいも", amount: 2, unit: "個", type: "通常食材", category: "野菜・果物" },
@@ -28,12 +22,7 @@ const SAMPLE_RECIPES = [
   { id: 2, name: "鶏の唐揚げ", tag: "主菜", favorite: true,
     memo: "二度揚げでカリッと。下味は30分以上漬けると美味しい。",
     url: "https://www.youtube.com/results?search_query=唐揚げ+レシピ",
-    steps: [
-      "鶏もも肉を一口大に切り、醤油・酒・すりおろしにんにくで30分漬ける。",
-      "片栗粉をまぶして170℃の油で4分揚げ、一度取り出す。",
-      "油を190℃に上げて再度1分揚げる（二度揚げ）。",
-      "油を切って完成。レモンを添えてどうぞ。"
-    ],
+    steps: ["鶏もも肉を一口大に切り、醤油・酒・すりおろしにんにくで30分漬ける。","片栗粉をまぶして170℃の油で4分揚げ、一度取り出す。","油を190℃に上げて再度1分揚げる（二度揚げ）。","油を切って完成。レモンを添えてどうぞ。"],
     ingredients: [
       { name: "鶏もも肉", amount: 300, unit: "g", type: "通常食材", category: "肉・魚" },
       { name: "醤油", amount: 2, unit: "大さじ", type: "調味料", category: "調味料" },
@@ -41,43 +30,23 @@ const SAMPLE_RECIPES = [
       { name: "にんにく", amount: 1, unit: "片", type: "通常食材", category: "野菜・果物" },
       { name: "片栗粉", amount: 4, unit: "大さじ", type: "調味料", category: "乾物・麺類・パスタ" },
     ]},
-  { id: 3, name: "ほうれん草のおひたし", tag: "副菜", favorite: false,
-    memo: "茹ですぎに注意。色鮮やかなうちに冷水に取る。",
-    url: "",
-    steps: [
-      "ほうれん草を塩少々入れた熱湯で1〜2分茹でる。",
-      "冷水にとって絞り、3〜4cmに切る。",
-      "醤油をかけてかつお節をのせる。"
-    ],
+  { id: 3, name: "ほうれん草のおひたし", tag: "副菜", favorite: false, memo: "茹ですぎに注意。色鮮やかなうちに冷水に取る。", url: "",
+    steps: ["ほうれん草を塩少々入れた熱湯で1〜2分茹でる。","冷水にとって絞り、3〜4cmに切る。","醤油をかけてかつお節をのせる。"],
     ingredients: [
       { name: "ほうれん草", amount: 1, unit: "袋", type: "通常食材", category: "野菜・果物" },
       { name: "醤油", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
       { name: "かつお節", amount: 1, unit: "パック", type: "通常食材", category: "乾物・麺類・パスタ" },
     ]},
-  { id: 4, name: "卵焼き", tag: "お弁当", favorite: true,
-    memo: "甘めが好きなら砂糖多め。巻くときはしっかり火を通して。",
-    url: "",
-    steps: [
-      "卵3個を割りほぐし、砂糖・醤油・みりんを加えてよく混ぜる。",
-      "卵焼き器に油を引き、卵液の1/3を流し入れて半熟になったら手前に巻く。",
-      "奥に移して残りの卵液を2回に分けて同様に巻く。",
-      "巻き簾で形を整えて冷ます。"
-    ],
+  { id: 4, name: "卵焼き", tag: "お弁当", favorite: true, memo: "甘めが好きなら砂糖多め。巻くときはしっかり火を通して。", url: "",
+    steps: ["卵3個を割りほぐし、砂糖・醤油・みりんを加えてよく混ぜる。","卵焼き器に油を引き、卵液の1/3を流し入れて半熟になったら手前に巻く。","奥に移して残りの卵液を2回に分けて同様に巻く。","巻き簾で形を整えて冷ます。"],
     ingredients: [
       { name: "卵", amount: 3, unit: "個", type: "通常食材", category: "卵・乳製品" },
       { name: "砂糖", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
       { name: "醤油", amount: 0.5, unit: "大さじ", type: "調味料", category: "調味料" },
       { name: "みりん", amount: 0.5, unit: "大さじ", type: "調味料", category: "調味料" },
     ]},
-  { id: 5, name: "豚汁", tag: "副菜", favorite: false,
-    memo: "根菜は先に炒めると甘みが出る。味噌は火を止めてから。",
-    url: "",
-    steps: [
-      "豚こま肉・大根・にんじん・こんにゃくを一口大に切る。",
-      "鍋にごま油を引いて豚肉を炒め、根菜を加えてさらに炒める。",
-      "水600mlを加えて沸騰したらアクを取り、中火で10分煮る。",
-      "火を止めてから味噌を溶き入れて完成。"
-    ],
+  { id: 5, name: "豚汁", tag: "副菜", favorite: false, memo: "根菜は先に炒めると甘みが出る。味噌は火を止めてから。", url: "",
+    steps: ["豚こま肉・大根・にんじん・こんにゃくを一口大に切る。","鍋にごま油を引いて豚肉を炒め、根菜を加えてさらに炒める。","水600mlを加えて沸騰したらアクを取り、中火で10分煮る。","火を止めてから味噌を溶き入れて完成。"],
     ingredients: [
       { name: "豚こま肉", amount: 100, unit: "g", type: "通常食材", category: "肉・魚" },
       { name: "大根", amount: 100, unit: "g", type: "通常食材", category: "野菜・果物" },
@@ -87,7 +56,6 @@ const SAMPLE_RECIPES = [
     ]},
 ]
 
-// ─────────────── ユーティリティ ───────────────
 function getWeekLabel() {
   const now = new Date()
   const y = now.getFullYear(), m = now.getMonth() + 1
@@ -111,7 +79,12 @@ function mergeIngredients(selections, recipes) {
   return Object.values(map)
 }
 
-// ─────────────── CSS ───────────────
+// ログイン状態をlocalStorageに保存・読み込み
+const LS_KEY = "kondate_uid"
+function getSavedUid() { try { return localStorage.getItem(LS_KEY) || null } catch { return null } }
+function saveUid(uid) { try { localStorage.setItem(LS_KEY, uid) } catch {} }
+function clearUid() { try { localStorage.removeItem(LS_KEY) } catch {} }
+
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&family=Zen+Old+Mincho:wght@400;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -139,6 +112,7 @@ input:focus,select:focus,textarea:focus{border-color:#3d2b08;box-shadow:0 0 0 3p
 .detail-sheet{background:#fdfaf6;border-radius:20px 20px 0 0;width:100%;max-width:480px;height:88vh;overflow-y:auto;animation:slideUp .25s;}
 @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .pill-btn{border:1.5px solid #d4c5b0;border-radius:20px;background:#fff;color:#5a4020;padding:6px 14px;font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s;font-weight:500;}
 .pill-btn.active{background:#3d2b08;color:#fff;border-color:#3d2b08;}
 .section-head{font-size:11px;font-weight:700;color:#b09070;letter-spacing:.1em;padding:0 4px;margin-bottom:6px;}
@@ -155,7 +129,7 @@ input:focus,select:focus,textarea:focus{border-color:#3d2b08;box-shadow:0 0 0 3p
 .history-week{border-radius:12px;overflow:hidden;border:1.5px solid #e8dcc8;}
 .empty-state{text-align:center;padding:60px 20px;color:#b09070;}
 .portion-select{border:1.5px solid #d4c5b0;border-radius:8px;background:#fff;color:#3d2b08;padding:5px 8px;font-size:12px;font-family:inherit;cursor:pointer;}
-.toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#3d2b08;color:#fff;border-radius:20px;padding:8px 20px;font-size:12px;z-index:400;animation:fadeIn .2s;white-space:nowrap;}
+.toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#3d2b08;color:#fff;border-radius:20px;padding:8px 20px;font-size:12px;z-index:400;animation:fadeIn .2s;white-space:nowrap;pointer-events:none;}
 .toast.error{background:#c0391b;}
 .error-msg{color:#c0391b;font-size:12px;margin-top:6px;padding:8px 12px;background:#fff0ee;border-radius:8px;}
 .login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f8f5f0;padding:24px;}
@@ -172,9 +146,10 @@ input:focus,select:focus,textarea:focus{border-color:#3d2b08;box-shadow:0 0 0 3p
 .detail-header{background:#3d2b08;color:#f8f0e4;padding:16px 20px 20px;}
 .url-btn{display:flex;align-items:center;gap:8px;background:#fff7ed;border:1.5px solid #e8c87a;border-radius:12px;padding:12px 16px;color:#8a6010;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;width:100%;text-decoration:none;}
 .url-btn:hover{background:#fff0d0;}
+.spinner{width:36px;height:36px;border:3px solid #e8dcc8;border-top-color:#3d2b08;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
 `
 
-// ─────────────── ログイン画面 ───────────────
+// ── ログイン画面 ──
 function LoginScreen({ onLogin }) {
   const [mode, setMode] = useState("login")
   const [username, setUsername] = useState("")
@@ -196,16 +171,16 @@ function LoginScreen({ onLogin }) {
         if (existing) { setError("そのユーザー名は既に使われています"); setLoading(false); return }
         const initData = { recipes: SAMPLE_RECIPES, history: [], weeklySelections: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] }
         await createUser(uid, hash, initData)
+        saveUid(uid)
         onLogin(uid, initData)
       } else {
         const user = await getUser(uid)
         if (!user) { setError("ユーザー名が見つかりません"); setLoading(false); return }
         if (user.password_hash !== hash) { setError("パスワードが違います"); setLoading(false); return }
+        saveUid(uid)
         onLogin(uid, user.data || { recipes: SAMPLE_RECIPES, history: [], weeklySelections: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] })
       }
-    } catch (e) {
-      setError("エラーが発生しました: " + e.message)
-    }
+    } catch (e) { setError("エラーが発生しました: " + e.message) }
     setLoading(false)
   }
 
@@ -235,26 +210,21 @@ function LoginScreen({ onLogin }) {
             {loading ? "処理中..." : mode === "login" ? "ログイン" : "アカウントを作成"}
           </button>
         </div>
-        {mode === "register" && (
-          <div style={{ marginTop: 16, fontSize: 11, color: "#b09070", textAlign: "center", lineHeight: 1.7 }}>
-            登録したアカウントで<br />スマホ・PCどこからでも使えます
-          </div>
-        )}
+        {mode === "register" && <div style={{ marginTop: 16, fontSize: 11, color: "#b09070", textAlign: "center", lineHeight: 1.7 }}>登録したアカウントで<br />スマホ・PCどこからでも使えます</div>}
       </div>
     </div>
   )
 }
 
-// ─────────────── レシピ詳細シート ───────────────
+// ── レシピ詳細シート ──
 function RecipeDetailSheet({ recipe, onClose, onEdit }) {
-  const [activeTab, setActiveTab] = useState("steps") // steps | ingredients
+  const [activeTab, setActiveTab] = useState("steps")
   if (!recipe) return null
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="detail-sheet">
-        {/* ヘッダー */}
         <div className="detail-header">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
             <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#f8f0e4", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>← 戻る</button>
             <button onClick={onEdit} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#f8f0e4", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>編集</button>
           </div>
@@ -265,8 +235,6 @@ function RecipeDetailSheet({ recipe, onClose, onEdit }) {
           <h2 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 24, fontWeight: 700, marginBottom: 6 }}>{recipe.name}</h2>
           {recipe.memo && <p style={{ fontSize: 13, color: "#d4b88a", lineHeight: 1.6 }}>💬 {recipe.memo}</p>}
         </div>
-
-        {/* URLボタン */}
         {recipe.url && (
           <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0e8d8" }}>
             <a href={recipe.url} target="_blank" rel="noopener noreferrer" className="url-btn">
@@ -276,65 +244,39 @@ function RecipeDetailSheet({ recipe, onClose, onEdit }) {
             </a>
           </div>
         )}
-
-        {/* タブ切り替え */}
         <div style={{ display: "flex", borderBottom: "2px solid #f0e8d8", background: "#fff" }}>
           {[{ id: "steps", label: "👨‍🍳 作り方" }, { id: "ingredients", label: "🥬 材料" }].map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-              flex: 1, border: "none", background: "none", padding: "13px", cursor: "pointer",
-              fontFamily: "inherit", fontSize: 14, fontWeight: 600,
-              color: activeTab === t.id ? "#3d2b08" : "#b09070",
-              borderBottom: activeTab === t.id ? "2px solid #3d2b08" : "2px solid transparent",
-              marginBottom: -2, transition: "all .15s"
-            }}>{t.label}</button>
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, border: "none", background: "none", padding: "13px", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: activeTab === t.id ? "#3d2b08" : "#b09070", borderBottom: activeTab === t.id ? "2px solid #3d2b08" : "2px solid transparent", marginBottom: -2, transition: "all .15s" }}>{t.label}</button>
           ))}
         </div>
-
-        {/* 作り方タブ */}
         {activeTab === "steps" && (
           <div style={{ padding: "20px 16px" }}>
-            {(!recipe.steps || recipe.steps.length === 0) ? (
-              <div style={{ textAlign: "center", padding: "40px 20px", color: "#b09070" }}>
-                <div style={{ fontSize: 36, marginBottom: 10 }}>📝</div>
-                <div>作り方が登録されていません</div>
-                <div style={{ fontSize: 12, marginTop: 6 }}>編集から追加できます</div>
-              </div>
-            ) : (
-              recipe.steps.map((step, i) => (
+            {(!recipe.steps || !recipe.steps.length)
+              ? <div style={{ textAlign: "center", padding: "40px 20px", color: "#b09070" }}><div style={{ fontSize: 36, marginBottom: 10 }}>📝</div><div>作り方が登録されていません</div><div style={{ fontSize: 12, marginTop: 6 }}>編集から追加できます</div></div>
+              : recipe.steps.map((step, i) => (
                 <div key={i} className="step-row">
                   <div className="step-num">{i + 1}</div>
                   <div className="step-text">{step}</div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         )}
-
-        {/* 材料タブ */}
         {activeTab === "ingredients" && (
           <div style={{ padding: "20px 16px" }}>
             <div style={{ fontSize: 12, color: "#b09070", marginBottom: 14 }}>基本 2人前</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
               {recipe.ingredients.filter(i => i.type === "通常食材").map((ing, i) => (
-                <div key={i} className="ing-chip">
-                  <span>{ing.name}</span>
-                  <span className="ing-amount">{ing.amount}{ing.unit}</span>
-                </div>
+                <div key={i} className="ing-chip"><span>{ing.name}</span><span className="ing-amount">{ing.amount}{ing.unit}</span></div>
               ))}
             </div>
-            {recipe.ingredients.some(i => i.type === "調味料") && (
-              <>
-                <div style={{ fontSize: 12, color: "#b09070", marginBottom: 10, fontWeight: 700, letterSpacing: "0.08em" }}>調味料</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {recipe.ingredients.filter(i => i.type === "調味料").map((ing, i) => (
-                    <div key={i} className="ing-chip" style={{ background: "#f5f0fa", borderColor: "#d8cce8" }}>
-                      <span>{ing.name}</span>
-                      <span className="ing-amount" style={{ color: "#6a3fa0" }}>{ing.amount}{ing.unit}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+            {recipe.ingredients.some(i => i.type === "調味料") && <>
+              <div style={{ fontSize: 12, color: "#b09070", marginBottom: 10, fontWeight: 700, letterSpacing: "0.08em" }}>調味料</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {recipe.ingredients.filter(i => i.type === "調味料").map((ing, i) => (
+                  <div key={i} className="ing-chip" style={{ background: "#f5f0fa", borderColor: "#d8cce8" }}><span>{ing.name}</span><span className="ing-amount" style={{ color: "#6a3fa0" }}>{ing.amount}{ing.unit}</span></div>
+                ))}
+              </div>
+            </>}
           </div>
         )}
       </div>
@@ -342,9 +284,10 @@ function RecipeDetailSheet({ recipe, onClose, onEdit }) {
   )
 }
 
-// ─────────────── メインアプリ ───────────────
+// ── メインアプリ ──
 export default function App() {
   const [userId, setUserId] = useState(null)
+  const [autoLogging, setAutoLogging] = useState(true) // 自動ログイン中フラグ
   const [screen, setScreen] = useState("catalog")
   const [recipes, setRecipes] = useState([])
   const [history, setHistory] = useState([])
@@ -356,15 +299,33 @@ export default function App() {
   const [filterFav, setFilterFav] = useState(false)
   const [editRecipe, setEditRecipe] = useState(null)
   const [showRegister, setShowRegister] = useState(false)
-  const [detailRecipe, setDetailRecipe] = useState(null) // レシピ詳細表示
+  const [detailRecipe, setDetailRecipe] = useState(null)
   const [expandedHistory, setExpandedHistory] = useState(null)
   const [toast, setToast] = useState(null)
   const saveTimer = useRef(null)
 
-  const showToast = (msg, type = "ok") => {
-    setToast({ msg, type })
-    setTimeout(() => setToast(null), 2200)
-  }
+  const showToast = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 2200) }
+
+  // ── 起動時に自動ログイン ──
+  useEffect(() => {
+    const uid = getSavedUid()
+    if (!uid) { setAutoLogging(false); return }
+    getUser(uid).then(user => {
+      if (user) {
+        const data = user.data || { recipes: SAMPLE_RECIPES, history: [], weeklySelections: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] }
+        setUserId(uid)
+        setRecipes(data.recipes || SAMPLE_RECIPES)
+        setHistory(data.history || [])
+        setWeeklySelections(data.weeklySelections || [])
+        setSeasoningChecks(data.seasoningChecks || {})
+        setShoppingAdjust(data.shoppingAdjust || {})
+        setDeletedItems(new Set(data.deletedItems || []))
+      } else {
+        clearUid()
+      }
+      setAutoLogging(false)
+    }).catch(() => { clearUid(); setAutoLogging(false) })
+  }, [])
 
   const handleLogin = (uid, data) => {
     setUserId(uid)
@@ -381,12 +342,8 @@ export default function App() {
     if (!userId) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
-      try {
-        await saveData(userId, newData)
-        showToast("保存しました ✓")
-      } catch (e) {
-        showToast("保存失敗: " + e.message, "error")
-      }
+      try { await saveData(userId, newData); showToast("保存しました ✓") }
+      catch (e) { showToast("保存失敗: " + e.message, "error") }
     }, 1500)
   }, [userId])
 
@@ -395,53 +352,29 @@ export default function App() {
     shoppingAdjust, deletedItems: [...deletedItems], ...overrides,
   }), [recipes, history, weeklySelections, seasoningChecks, shoppingAdjust, deletedItems])
 
-  // ── レシピ操作 ──
-  const toggleFavorite = id => {
-    const next = recipes.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r)
-    setRecipes(next); triggerSave(buildSave({ recipes: next }))
-  }
+  const toggleFavorite = id => { const next = recipes.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r); setRecipes(next); triggerSave(buildSave({ recipes: next })) }
   const saveRecipe = recipe => {
     const next = recipe.id ? recipes.map(r => r.id === recipe.id ? recipe : r) : [...recipes, { ...recipe, id: Date.now() }]
     setRecipes(next); triggerSave(buildSave({ recipes: next }))
     setShowRegister(false); setEditRecipe(null)
-    // 編集後は詳細画面を更新
     if (detailRecipe && recipe.id === detailRecipe.id) setDetailRecipe(recipe)
   }
   const deleteRecipe = id => {
-    const nextR = recipes.filter(r => r.id !== id)
-    const nextW = weeklySelections.filter(s => s.recipeId !== id)
-    setRecipes(nextR); setWeeklySelections(nextW)
-    triggerSave(buildSave({ recipes: nextR, weeklySelections: nextW }))
+    const nextR = recipes.filter(r => r.id !== id), nextW = weeklySelections.filter(s => s.recipeId !== id)
+    setRecipes(nextR); setWeeklySelections(nextW); triggerSave(buildSave({ recipes: nextR, weeklySelections: nextW }))
     if (detailRecipe?.id === id) setDetailRecipe(null)
   }
-
-  // ── 今週メニュー ──
   const toggleWeeklyMenu = (day, recipeId) => {
     const exists = weeklySelections.find(s => s.day === day && s.recipeId === recipeId)
-    const next = exists
-      ? weeklySelections.filter(s => !(s.day === day && s.recipeId === recipeId))
-      : [...weeklySelections, { day, recipeId, portion: 1 }]
+    const next = exists ? weeklySelections.filter(s => !(s.day === day && s.recipeId === recipeId)) : [...weeklySelections, { day, recipeId, portion: 1 }]
     setWeeklySelections(next); triggerSave(buildSave({ weeklySelections: next }))
   }
-  const setWeeklyPortion = (day, recipeId, portion) => {
-    const next = weeklySelections.map(s => s.day === day && s.recipeId === recipeId ? { ...s, portion } : s)
-    setWeeklySelections(next); triggerSave(buildSave({ weeklySelections: next }))
-  }
+  const setWeeklyPortion = (day, recipeId, portion) => { const next = weeklySelections.map(s => s.day === day && s.recipeId === recipeId ? { ...s, portion } : s); setWeeklySelections(next); triggerSave(buildSave({ weeklySelections: next })) }
+  const toggleSeasoningCheck = name => { const next = { ...seasoningChecks, [name]: !seasoningChecks[name] }; setSeasoningChecks(next); triggerSave(buildSave({ seasoningChecks: next })) }
 
-  // ── 調味料 ──
-  const toggleSeasoningCheck = name => {
-    const next = { ...seasoningChecks, [name]: !seasoningChecks[name] }
-    setSeasoningChecks(next); triggerSave(buildSave({ seasoningChecks: next }))
-  }
-
-  // ── 買い物 ──
   const weeklySeasonings = useMemo(() => {
     const map = {}
-    weeklySelections.forEach(sel => {
-      const r = recipes.find(r => r.id === sel.recipeId)
-      if (!r) return
-      r.ingredients.filter(i => i.type === "調味料").forEach(ing => { map[ing.name] = ing })
-    })
+    weeklySelections.forEach(sel => { const r = recipes.find(r => r.id === sel.recipeId); if (!r) return; r.ingredients.filter(i => i.type === "調味料").forEach(ing => { map[ing.name] = ing }) })
     return Object.values(map)
   }, [weeklySelections, recipes])
 
@@ -454,10 +387,8 @@ export default function App() {
   const shoppingList = useMemo(() => baseShoppingList
     .filter(i => !deletedItems.has(i.name))
     .map(i => ({ ...i, displayAmount: shoppingAdjust[i.name] !== undefined ? shoppingAdjust[i.name] : i.amount }))
-    .sort((a, b) => {
-      const ai = STORE_ORDER.indexOf(a.category), bi = STORE_ORDER.indexOf(b.category)
-      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi)
-    }), [baseShoppingList, shoppingAdjust, deletedItems])
+    .sort((a, b) => { const ai = STORE_ORDER.indexOf(a.category), bi = STORE_ORDER.indexOf(b.category); return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) })
+  , [baseShoppingList, shoppingAdjust, deletedItems])
 
   const adjustShopping = (name, delta, unit) => {
     const step = ["個","本","袋","枚","パック","片","束"].includes(unit) ? 1 : 10
@@ -465,36 +396,38 @@ export default function App() {
     const next = { ...shoppingAdjust, [name]: Math.max(0, cur + delta * step) }
     setShoppingAdjust(next); triggerSave(buildSave({ shoppingAdjust: next }))
   }
-  const removeShoppingItem = name => {
-    const next = new Set([...deletedItems, name])
-    setDeletedItems(next); triggerSave(buildSave({ deletedItems: [...next] }))
-  }
+  const removeShoppingItem = name => { const next = new Set([...deletedItems, name]); setDeletedItems(next); triggerSave(buildSave({ deletedItems: [...next] })) }
 
-  // ── 今週確定 ──
   const confirmWeek = () => {
-    const menus = weeklySelections
-      .map(s => { const r = recipes.find(r => r.id === s.recipeId); return { day: s.day, name: r ? r.name : "不明", portion: s.portion } })
-      .sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day))
+    const menus = weeklySelections.map(s => { const r = recipes.find(r => r.id === s.recipeId); return { day: s.day, name: r ? r.name : "不明", portion: s.portion } }).sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day))
     const newHistory = [{ id: Date.now(), weekLabel: getWeekLabel(), menus }, ...history]
-    setHistory(newHistory)
-    setWeeklySelections([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set())
+    setHistory(newHistory); setWeeklySelections([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set())
     triggerSave(buildSave({ history: newHistory, weeklySelections: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] }))
     setScreen("history")
   }
 
-  const logout = () => {
-    setUserId(null); setRecipes([]); setHistory([])
-    setWeeklySelections([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set())
-  }
+  const logout = () => { clearUid(); setUserId(null); setRecipes([]); setHistory([]); setWeeklySelections([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set()) }
+
+  // 自動ログイン中はスピナー表示
+  if (autoLogging) return (
+    <>
+      <style>{CSS}</style>
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f8f5f0" }}>
+        <div style={{ fontSize: 48, marginBottom: 20 }}>🥢</div>
+        <div className="spinner" />
+        <div style={{ fontSize: 13, color: "#b09070" }}>データを読み込んでいます...</div>
+      </div>
+    </>
+  )
 
   if (!userId) return (<><style>{CSS}</style><LoginScreen onLogin={handleLogin} /></>)
 
   const navItems = [
-    { id: "catalog",   icon: "📋", label: "カタログ" },
-    { id: "weekly",    icon: "📅", label: "今週" },
+    { id: "catalog", icon: "📋", label: "カタログ" },
+    { id: "weekly", icon: "📅", label: "今週" },
     { id: "seasoning", icon: "🧂", label: "調味料" },
-    { id: "shopping",  icon: "🛒", label: "買い物" },
-    { id: "history",   icon: "📖", label: "履歴" },
+    { id: "shopping", icon: "🛒", label: "買い物" },
+    { id: "history", icon: "📖", label: "履歴" },
   ]
 
   return (
@@ -510,68 +443,48 @@ export default function App() {
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 11, color: "#c9b090" }}>👤 {userId}</span>
-          {screen === "catalog" && (
-            <button className="btn btn-outline btn-sm" style={{ background: "transparent", color: "#f8f0e4", borderColor: "#6a5030" }}
-              onClick={() => { setEditRecipe(null); setShowRegister(true) }}>＋ 追加</button>
-          )}
+          {screen === "catalog" && <button className="btn btn-outline btn-sm" style={{ background: "transparent", color: "#f8f0e4", borderColor: "#6a5030" }} onClick={() => { setEditRecipe(null); setShowRegister(true) }}>＋ 追加</button>}
           <button className="btn btn-ghost btn-sm" style={{ color: "#c9b090", fontSize: 11 }} onClick={logout}>ログアウト</button>
         </div>
       </header>
 
       <div className="screen" style={{ flex: 1 }}>
 
-        {/* ── カタログ ── */}
         {screen === "catalog" && (
           <div style={{ padding: "16px 16px 0" }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
               <button className={`pill-btn ${filterFav ? "active" : ""}`} onClick={() => setFilterFav(f => !f)}>★ お気に入り</button>
-              {["すべて", ...TAGS].map(t => (
-                <button key={t} className={`pill-btn ${filterTag === t ? "active" : ""}`} onClick={() => setFilterTag(t)}>{t}</button>
-              ))}
+              {["すべて", ...TAGS].map(t => <button key={t} className={`pill-btn ${filterTag === t ? "active" : ""}`} onClick={() => setFilterTag(t)}>{t}</button>)}
             </div>
             {(() => {
               const filtered = recipes.filter(r => (!filterFav || r.favorite) && (filterTag === "すべて" || r.tag === filterTag))
-              if (!filtered.length) return (
-                <div className="empty-state">
-                  <div style={{ fontSize: 44, marginBottom: 12 }}>🍽️</div>
-                  <div style={{ fontWeight: 600, marginBottom: 6 }}>レシピがありません</div>
-                  <div style={{ fontSize: 12 }}>右上の「＋追加」から登録してね</div>
-                </div>
-              )
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {filtered.map(r => (
-                    <div key={r.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 6px rgba(80,60,20,0.06)", overflow: "hidden" }}>
-                      {/* タップでレシピ詳細 */}
-                      <div style={{ padding: "13px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
-                        onClick={() => setDetailRecipe(r)}>
-                        <button className="fav-btn" onClick={e => { e.stopPropagation(); toggleFavorite(r.id) }}>{r.favorite ? "★" : "☆"}</button>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: r.memo ? 3 : 0 }}>
-                            <span style={{ fontWeight: 700, fontSize: 15 }}>{r.name}</span>
-                            <span className={`tag tag-${r.tag}`}>{r.tag}</span>
-                          </div>
-                          {r.memo && <div style={{ fontSize: 11, color: "#a08870", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.memo}</div>}
+              if (!filtered.length) return <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🍽️</div><div style={{ fontWeight: 600, marginBottom: 6 }}>レシピがありません</div><div style={{ fontSize: 12 }}>右上の「＋追加」から登録してね</div></div>
+              return <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {filtered.map(r => (
+                  <div key={r.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 6px rgba(80,60,20,0.06)", overflow: "hidden" }}>
+                    <div style={{ padding: "13px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setDetailRecipe(r)}>
+                      <button className="fav-btn" onClick={e => { e.stopPropagation(); toggleFavorite(r.id) }}>{r.favorite ? "★" : "☆"}</button>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: r.memo ? 3 : 0 }}>
+                          <span style={{ fontWeight: 700, fontSize: 15 }}>{r.name}</span>
+                          <span className={`tag tag-${r.tag}`}>{r.tag}</span>
                         </div>
-                        <span style={{ color: "#c9b090", fontSize: 18 }}>›</span>
+                        {r.memo && <div style={{ fontSize: 11, color: "#a08870", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.memo}</div>}
                       </div>
-                      {/* 編集・削除ボタン */}
-                      <div style={{ display: "flex", borderTop: "1px solid #f5ede0", background: "#fdfaf6" }}>
-                        <button className="btn btn-ghost btn-sm" style={{ flex: 1, padding: "8px", borderRadius: 0, fontSize: 12 }}
-                          onClick={() => { setEditRecipe(r); setShowRegister(true) }}>✏️ 編集</button>
-                        <div style={{ width: 1, background: "#f0e8d8" }} />
-                        <button className="btn btn-ghost btn-sm" style={{ flex: 1, padding: "8px", borderRadius: 0, fontSize: 12, color: "#c0391b" }}
-                          onClick={() => deleteRecipe(r.id)}>🗑 削除</button>
-                      </div>
+                      <span style={{ color: "#c9b090", fontSize: 20 }}>›</span>
                     </div>
-                  ))}
-                </div>
-              )
+                    <div style={{ display: "flex", borderTop: "1px solid #f5ede0", background: "#fdfaf6" }}>
+                      <button className="btn btn-ghost btn-sm" style={{ flex: 1, padding: "8px", borderRadius: 0, fontSize: 12 }} onClick={() => { setEditRecipe(r); setShowRegister(true) }}>✏️ 編集</button>
+                      <div style={{ width: 1, background: "#f0e8d8" }} />
+                      <button className="btn btn-ghost btn-sm" style={{ flex: 1, padding: "8px", borderRadius: 0, fontSize: 12, color: "#c0391b" }} onClick={() => deleteRecipe(r.id)}>🗑 削除</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             })()}
           </div>
         )}
 
-        {/* ── 今週のメニュー ── */}
         {screen === "weekly" && (
           <div style={{ padding: "16px 16px 0" }}>
             <div style={{ marginBottom: 14, fontSize: 13, color: "#8a7050" }}>曜日ごとにメニューを選んで分量を設定してね</div>
@@ -591,9 +504,7 @@ export default function App() {
                       return (
                         <div key={sel.recipeId} className="item-row">
                           <span className={`tag tag-${r.tag}`}>{r.tag}</span>
-                          {/* レシピ名タップで詳細 */}
-                          <span style={{ flex: 1, fontWeight: 500, fontSize: 14, cursor: "pointer", textDecoration: "underline", textDecorationColor: "#d4c5b0" }}
-                            onClick={() => setDetailRecipe(r)}>{r.name}</span>
+                          <span style={{ flex: 1, fontWeight: 500, fontSize: 14, cursor: "pointer", textDecoration: "underline", textDecorationColor: "#d4c5b0" }} onClick={() => setDetailRecipe(r)}>{r.name}</span>
                           <select className="portion-select" value={sel.portion} onChange={e => setWeeklyPortion(day, sel.recipeId, Number(e.target.value))}>
                             <option value={1}>1日分（2人前）</option>
                             <option value={2}>2日分（4人前）</option>
@@ -614,15 +525,10 @@ export default function App() {
                 </div>
               )
             })}
-            {weeklySelections.length > 0 && (
-              <button className="btn btn-primary" style={{ width: "100%", padding: "13px", marginTop: 12 }} onClick={() => setScreen("seasoning")}>
-                調味料チェックへ進む →
-              </button>
-            )}
+            {weeklySelections.length > 0 && <button className="btn btn-primary" style={{ width: "100%", padding: "13px", marginTop: 12 }} onClick={() => setScreen("seasoning")}>調味料チェックへ進む →</button>}
           </div>
         )}
 
-        {/* ── 調味料チェック ── */}
         {screen === "seasoning" && (
           <div style={{ padding: "16px 16px 0" }}>
             <div style={{ marginBottom: 14, fontSize: 13, color: "#8a7050" }}>今週のメニューで使う調味料です。<br />家にない・買い足したいものにチェックを入れてね ✓</div>
@@ -631,28 +537,20 @@ export default function App() {
               {weeklySeasonings.map(s => (
                 <div key={s.name} className="check-row" onClick={() => toggleSeasoningCheck(s.name)}>
                   <div className={`custom-check ${seasoningChecks[s.name] ? "checked" : ""}`}>{seasoningChecks[s.name] ? "✓" : ""}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: "#a08870" }}>{s.category}</div>
-                  </div>
+                  <div style={{ flex: 1 }}><div style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</div><div style={{ fontSize: 11, color: "#a08870" }}>{s.category}</div></div>
                   {seasoningChecks[s.name] && <span style={{ fontSize: 11, color: "#c0391b", fontWeight: 700 }}>買い物リストへ追加</span>}
                 </div>
               ))}
             </div>
-            <button className="btn btn-primary" style={{ width: "100%", padding: "13px" }} onClick={() => setScreen("shopping")}>
-              買い物リストを見る →
-            </button>
+            <button className="btn btn-primary" style={{ width: "100%", padding: "13px" }} onClick={() => setScreen("shopping")}>買い物リストを見る →</button>
           </div>
         )}
 
-        {/* ── 買い物リスト ── */}
         {screen === "shopping" && (
           <div style={{ padding: "16px 16px 0" }}>
             <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ fontSize: 13, color: "#8a7050" }}>＋−で数量を微調整できます</div>
-              {weeklySelections.length > 0 && (
-                <button className="btn btn-primary btn-sm" style={{ fontSize: 12, padding: "8px 14px" }} onClick={confirmWeek}>今週を確定して保存</button>
-              )}
+              {weeklySelections.length > 0 && <button className="btn btn-primary btn-sm" style={{ fontSize: 12, padding: "8px 14px" }} onClick={confirmWeek}>今週を確定して保存</button>}
             </div>
             {!shoppingList.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div><div>メニューを選択してください</div></div>}
             {STORE_ORDER.map(cat => {
@@ -664,19 +562,14 @@ export default function App() {
                   <div className="card" style={{ overflow: "hidden" }}>
                     {items.map(item => (
                       <div key={item.name} className="item-row">
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 500, fontSize: 14 }}>{item.name}</div>
-                          {item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}
-                        </div>
-                        {!item.isSeasoning ? (
-                          <div className="num-ctrl">
-                            <button className="num-btn" onClick={() => adjustShopping(item.name, -1, item.unit)}>−</button>
-                            <span style={{ minWidth: 54, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
-                            <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit)}>＋</button>
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: 13, color: "#8a7050" }}>適量</span>
-                        )}
+                        <div style={{ flex: 1 }}><div style={{ fontWeight: 500, fontSize: 14 }}>{item.name}</div>{item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}</div>
+                        {!item.isSeasoning
+                          ? <div className="num-ctrl">
+                              <button className="num-btn" onClick={() => adjustShopping(item.name, -1, item.unit)}>−</button>
+                              <span style={{ minWidth: 54, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
+                              <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit)}>＋</button>
+                            </div>
+                          : <span style={{ fontSize: 13, color: "#8a7050" }}>適量</span>}
                         <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => removeShoppingItem(item.name)}>✕</button>
                       </div>
                     ))}
@@ -687,18 +580,13 @@ export default function App() {
           </div>
         )}
 
-        {/* ── 履歴 ── */}
         {screen === "history" && (
           <div style={{ padding: "16px 16px 0" }}>
             {!history.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>📖</div><div>まだ履歴がありません</div></div>}
             {history.map(week => (
               <div key={week.id} className="history-week" style={{ marginBottom: 14, background: "#fff" }}>
-                <div style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: expandedHistory === week.id ? "#faf3e8" : "#fff" }}
-                  onClick={() => setExpandedHistory(expandedHistory === week.id ? null : week.id)}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{week.weekLabel}</div>
-                    <div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>{week.menus.length}メニュー</div>
-                  </div>
+                <div style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: expandedHistory === week.id ? "#faf3e8" : "#fff" }} onClick={() => setExpandedHistory(expandedHistory === week.id ? null : week.id)}>
+                  <div><div style={{ fontWeight: 700, fontSize: 14 }}>{week.weekLabel}</div><div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>{week.menus.length}メニュー</div></div>
                   <span style={{ color: "#8a7050" }}>{expandedHistory === week.id ? "▲" : "▼"}</span>
                 </div>
                 {expandedHistory === week.id && (
@@ -718,7 +606,6 @@ export default function App() {
         )}
       </div>
 
-      {/* ボトムナビ */}
       <nav style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#fff", borderTop: "1px solid #e8dcc8", display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
         {navItems.map(n => (
           <button key={n.id} onClick={() => setScreen(n.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, fontFamily: "inherit", color: screen === n.id ? "#3d2b08" : "#b09070", transition: "color .15s" }}>
@@ -729,34 +616,17 @@ export default function App() {
         ))}
       </nav>
 
-      {/* レシピ詳細シート */}
-      {detailRecipe && (
-        <RecipeDetailSheet
-          recipe={detailRecipe}
-          onClose={() => setDetailRecipe(null)}
-          onEdit={() => { setEditRecipe(detailRecipe); setShowRegister(true); setDetailRecipe(null) }}
-        />
-      )}
-
-      {/* レシピ登録・編集シート */}
-      {showRegister && (
-        <RegisterSheet recipe={editRecipe} onSave={saveRecipe} onClose={() => { setShowRegister(false); setEditRecipe(null) }} />
-      )}
+      {detailRecipe && <RecipeDetailSheet recipe={detailRecipe} onClose={() => setDetailRecipe(null)} onEdit={() => { setEditRecipe(detailRecipe); setShowRegister(true); setDetailRecipe(null) }} />}
+      {showRegister && <RegisterSheet recipe={editRecipe} onSave={saveRecipe} onClose={() => { setShowRegister(false); setEditRecipe(null) }} />}
     </div>
   )
 }
 
-// ─────────────── レシピ登録シート ───────────────
+// ── レシピ登録シート ──
 function RegisterSheet({ recipe, onSave, onClose }) {
   const blank = { name: "", tag: "主菜", favorite: false, memo: "", url: "", steps: [""], ingredients: [{ name: "", amount: "", unit: "g", type: "通常食材", category: "野菜・果物" }] }
-  const [form, setForm] = useState(() => {
-    if (!recipe) return blank
-    const r = JSON.parse(JSON.stringify(recipe))
-    if (!r.steps) r.steps = [""]
-    return r
-  })
-  const [regTab, setRegTab] = useState("basic") // basic | steps | ingredients
-
+  const [form, setForm] = useState(() => { if (!recipe) return blank; const r = JSON.parse(JSON.stringify(recipe)); if (!r.steps) r.steps = [""]; return r })
+  const [regTab, setRegTab] = useState("basic")
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const setStep = (i, v) => setForm(f => ({ ...f, steps: f.steps.map((s, j) => j === i ? v : s) }))
   const addStep = () => setForm(f => ({ ...f, steps: [...f.steps, ""] }))
@@ -764,14 +634,7 @@ function RegisterSheet({ recipe, onSave, onClose }) {
   const setIng = (i, k, v) => setForm(f => ({ ...f, ingredients: f.ingredients.map((x, j) => j === i ? { ...x, [k]: v } : x) }))
   const addIng = () => setForm(f => ({ ...f, ingredients: [...f.ingredients, { name: "", amount: "", unit: "g", type: "通常食材", category: "野菜・果物" }] }))
   const removeIng = i => setForm(f => ({ ...f, ingredients: f.ingredients.filter((_, j) => j !== i) }))
-
-  const tabStyle = (id) => ({
-    flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer",
-    fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-    color: regTab === id ? "#3d2b08" : "#b09070",
-    borderBottom: regTab === id ? "2px solid #3d2b08" : "2px solid transparent",
-    transition: "all .15s"
-  })
+  const tabStyle = id => ({ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: regTab === id ? "#3d2b08" : "#b09070", borderBottom: regTab === id ? "2px solid #3d2b08" : "2px solid transparent", transition: "all .15s" })
 
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -780,45 +643,22 @@ function RegisterSheet({ recipe, onSave, onClose }) {
           <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 18, fontWeight: 700 }}>{recipe ? "レシピを編集" : "レシピを追加"}</h3>
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
         </div>
-
-        {/* 登録タブ */}
         <div style={{ display: "flex", borderBottom: "1px solid #f0e8d8", marginBottom: 18 }}>
           <button style={tabStyle("basic")} onClick={() => setRegTab("basic")}>基本情報</button>
           <button style={tabStyle("steps")} onClick={() => setRegTab("steps")}>作り方</button>
           <button style={tabStyle("ingredients")} onClick={() => setRegTab("ingredients")}>材料</button>
         </div>
-
-        {/* 基本情報タブ */}
         {regTab === "basic" && (
           <div style={{ display: "grid", gap: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "flex-end" }}>
-              <div>
-                <label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>レシピ名 *</label>
-                <input placeholder="例: 肉じゃが" value={form.name} onChange={e => set("name", e.target.value)} />
-              </div>
-              <button onClick={() => set("favorite", !form.favorite)} style={{ background: "none", border: "1.5px solid #d4c5b0", borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontSize: 22 }}>
-                {form.favorite ? "★" : "☆"}
-              </button>
+              <div><label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>レシピ名 *</label><input placeholder="例: 肉じゃが" value={form.name} onChange={e => set("name", e.target.value)} /></div>
+              <button onClick={() => set("favorite", !form.favorite)} style={{ background: "none", border: "1.5px solid #d4c5b0", borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontSize: 22 }}>{form.favorite ? "★" : "☆"}</button>
             </div>
-            <div>
-              <label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>分類タグ</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {TAGS.map(t => <button key={t} className={`pill-btn ${form.tag === t ? "active" : ""}`} onClick={() => set("tag", t)}>{t}</button>)}
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>メモ・コツ</label>
-              <textarea rows={2} placeholder="調理のコツや気づきなど..." value={form.memo} onChange={e => set("memo", e.target.value)} style={{ resize: "vertical" }} />
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>参考URL（YouTube等）</label>
-              <input placeholder="https://..." value={form.url} onChange={e => set("url", e.target.value)} />
-              {form.url && <a href={form.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#7a9fc0", display: "block", marginTop: 4 }}>🔗 URLを確認</a>}
-            </div>
+            <div><label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>分類タグ</label><div style={{ display: "flex", gap: 8 }}>{TAGS.map(t => <button key={t} className={`pill-btn ${form.tag === t ? "active" : ""}`} onClick={() => set("tag", t)}>{t}</button>)}</div></div>
+            <div><label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>メモ・コツ</label><textarea rows={2} placeholder="調理のコツや気づきなど..." value={form.memo} onChange={e => set("memo", e.target.value)} style={{ resize: "vertical" }} /></div>
+            <div><label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>参考URL（YouTube等）</label><input placeholder="https://..." value={form.url} onChange={e => set("url", e.target.value)} />{form.url && <a href={form.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#7a9fc0", display: "block", marginTop: 4 }}>🔗 URLを確認</a>}</div>
           </div>
         )}
-
-        {/* 作り方タブ */}
         {regTab === "steps" && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -828,18 +668,12 @@ function RegisterSheet({ recipe, onSave, onClose }) {
             {form.steps.map((step, i) => (
               <div key={i} style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-start" }}>
                 <div className="step-num" style={{ flexShrink: 0, marginTop: 4 }}>{i + 1}</div>
-                <textarea
-                  rows={2} placeholder={`手順 ${i + 1}...`} value={step}
-                  onChange={e => setStep(i, e.target.value)}
-                  style={{ flex: 1, resize: "vertical", fontSize: 13, padding: "8px 10px" }}
-                />
+                <textarea rows={2} placeholder={`手順 ${i + 1}...`} value={step} onChange={e => setStep(i, e.target.value)} style={{ flex: 1, resize: "vertical", fontSize: 13, padding: "8px 10px" }} />
                 <button onClick={() => removeStep(i)} style={{ background: "none", border: "1.5px solid #e0d0c0", borderRadius: 8, cursor: "pointer", color: "#c0391b", width: 32, height: 32, fontSize: 14, flexShrink: 0, marginTop: 4 }}>×</button>
               </div>
             ))}
           </div>
         )}
-
-        {/* 材料タブ */}
         {regTab === "ingredients" && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -855,18 +689,13 @@ function RegisterSheet({ recipe, onSave, onClose }) {
                   <button onClick={() => removeIng(i)} style={{ background: "none", border: "1.5px solid #e0d0c0", borderRadius: 8, cursor: "pointer", color: "#c0391b", width: 32, fontSize: 14 }}>×</button>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                  <select value={ing.type} onChange={e => setIng(i, "type", e.target.value)} style={{ fontSize: 12, padding: "6px 8px" }}>
-                    <option>通常食材</option><option>調味料</option>
-                  </select>
-                  <select value={ing.category} onChange={e => setIng(i, "category", e.target.value)} style={{ fontSize: 12, padding: "6px 8px" }}>
-                    {STORE_ORDER.map(c => <option key={c}>{c}</option>)}
-                  </select>
+                  <select value={ing.type} onChange={e => setIng(i, "type", e.target.value)} style={{ fontSize: 12, padding: "6px 8px" }}><option>通常食材</option><option>調味料</option></select>
+                  <select value={ing.category} onChange={e => setIng(i, "category", e.target.value)} style={{ fontSize: 12, padding: "6px 8px" }}>{STORE_ORDER.map(c => <option key={c}>{c}</option>)}</select>
                 </div>
               </div>
             ))}
           </div>
         )}
-
         <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
           <button className="btn btn-outline" style={{ flex: 1 }} onClick={onClose}>キャンセル</button>
           <button className="btn btn-primary" style={{ flex: 2, padding: "13px" }} onClick={() => form.name && onSave({ ...form, steps: form.steps.filter(s => s.trim()) })}>保存する</button>
