@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { hashPassword, getUser, createUser, saveData } from "./supabase.js"
+import { extractRecipeFromUrl, extractRecipeFromText, mergeIngredientsAdvanced, normalizeName, normalizeUnit } from "./gemini.js"
 
 const TAGS = ["主菜", "副菜", "お弁当"]
 const STORE_ORDER = ["野菜・果物","肉・魚","卵・乳製品","加工食品・大豆製品","乾物・麺類・パスタ","調味料","冷凍食品・その他"]
-const DAYS = ["月","火","水","木","金","土","日"]
 
 const SAMPLE_RECIPES = [
   { id: 1, name: "肉じゃが", tag: "主菜", favorite: true,
@@ -22,7 +22,7 @@ const SAMPLE_RECIPES = [
   { id: 2, name: "鶏の唐揚げ", tag: "主菜", favorite: true,
     memo: "二度揚げでカリッと。下味は30分以上漬けると美味しい。",
     url: "https://www.youtube.com/results?search_query=唐揚げ+レシピ",
-    steps: ["鶏もも肉を一口大に切り、醤油・酒・すりおろしにんにくで30分漬ける。","片栗粉をまぶして170℃の油で4分揚げ、一度取り出す。","油を190℃に上げて再度1分揚げる（二度揚げ）。","油を切って完成。レモンを添えてどうぞ。"],
+    steps: ["鶏もも肉を一口大に切り、醤油・酒・すりおろしにんにくで30分漬ける。","片栗粉をまぶして170℃の油で4分揚げ、一度取り出す。","油を190℃に上げて再度1分揚げる。","油を切って完成。"],
     ingredients: [
       { name: "鶏もも肉", amount: 300, unit: "g", type: "通常食材", category: "肉・魚" },
       { name: "醤油", amount: 2, unit: "大さじ", type: "調味料", category: "調味料" },
@@ -30,22 +30,22 @@ const SAMPLE_RECIPES = [
       { name: "にんにく", amount: 1, unit: "片", type: "通常食材", category: "野菜・果物" },
       { name: "片栗粉", amount: 4, unit: "大さじ", type: "調味料", category: "乾物・麺類・パスタ" },
     ]},
-  { id: 3, name: "ほうれん草のおひたし", tag: "副菜", favorite: false, memo: "茹ですぎに注意。色鮮やかなうちに冷水に取る。", url: "",
+  { id: 3, name: "ほうれん草のおひたし", tag: "副菜", favorite: false, memo: "茹ですぎに注意。", url: "",
     steps: ["ほうれん草を塩少々入れた熱湯で1〜2分茹でる。","冷水にとって絞り、3〜4cmに切る。","醤油をかけてかつお節をのせる。"],
     ingredients: [
       { name: "ほうれん草", amount: 1, unit: "袋", type: "通常食材", category: "野菜・果物" },
       { name: "醤油", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
       { name: "かつお節", amount: 1, unit: "パック", type: "通常食材", category: "乾物・麺類・パスタ" },
     ]},
-  { id: 4, name: "卵焼き", tag: "お弁当", favorite: true, memo: "甘めが好きなら砂糖多め。巻くときはしっかり火を通して。", url: "",
-    steps: ["卵3個を割りほぐし、砂糖・醤油・みりんを加えてよく混ぜる。","卵焼き器に油を引き、卵液の1/3を流し入れて半熟になったら手前に巻く。","奥に移して残りの卵液を2回に分けて同様に巻く。","巻き簾で形を整えて冷ます。"],
+  { id: 4, name: "卵焼き", tag: "お弁当", favorite: true, memo: "甘めが好きなら砂糖多め。", url: "",
+    steps: ["卵3個を割りほぐし、砂糖・醤油・みりんを加えてよく混ぜる。","卵焼き器に油を引き、卵液の1/3を流し入れて半熟になったら手前に巻く。","残りの卵液を2回に分けて同様に巻く。","巻き簾で形を整えて冷ます。"],
     ingredients: [
       { name: "卵", amount: 3, unit: "個", type: "通常食材", category: "卵・乳製品" },
       { name: "砂糖", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
       { name: "醤油", amount: 0.5, unit: "大さじ", type: "調味料", category: "調味料" },
       { name: "みりん", amount: 0.5, unit: "大さじ", type: "調味料", category: "調味料" },
     ]},
-  { id: 5, name: "豚汁", tag: "副菜", favorite: false, memo: "根菜は先に炒めると甘みが出る。味噌は火を止めてから。", url: "",
+  { id: 5, name: "豚汁", tag: "副菜", favorite: false, memo: "味噌は火を止めてから。", url: "",
     steps: ["豚こま肉・大根・にんじん・こんにゃくを一口大に切る。","鍋にごま油を引いて豚肉を炒め、根菜を加えてさらに炒める。","水600mlを加えて沸騰したらアクを取り、中火で10分煮る。","火を止めてから味噌を溶き入れて完成。"],
     ingredients: [
       { name: "豚こま肉", amount: 100, unit: "g", type: "通常食材", category: "肉・魚" },
@@ -56,35 +56,43 @@ const SAMPLE_RECIPES = [
     ]},
 ]
 
-function getWeekLabel() {
-  const now = new Date()
-  const y = now.getFullYear(), m = now.getMonth() + 1
-  const weekNum = Math.ceil(now.getDate() / 7)
-  const d1 = new Date(now); d1.setDate(now.getDate() - now.getDay() + 1)
-  const d2 = new Date(d1); d2.setDate(d1.getDate() + 6)
-  const fmt = d => `${d.getMonth()+1}/${d.getDate()}`
-  return `${y}年${m}月第${weekNum}週（${fmt(d1)}〜${fmt(d2)}）`
+// ── ユーティリティ ──
+function formatDateLabel(dateStr) {
+  if (!dateStr) return ""
+  const d = new Date(dateStr)
+  const days = ["日","月","火","水","木","金","土"]
+  return `${d.getMonth()+1}/${d.getDate()}（${days[d.getDay()]}）`
 }
 
-function mergeIngredients(selections, recipes) {
+function formatPeriodLabel(entries) {
+  const dates = entries.map(e => e.date).filter(Boolean).sort()
+  if (!dates.length) return "期間未設定"
+  const first = new Date(dates[0]), last = new Date(dates[dates.length-1])
+  const fmt = d => `${d.getMonth()+1}/${d.getDate()}`
+  return `${first.getFullYear()}年${first.getMonth()+1}月${fmt(first)}〜${fmt(last)}`
+}
+
+function mergeSeasonings(selections, recipes) {
   const map = {}
   selections.forEach(sel => {
-    const recipe = recipes.find(r => r.id === sel.recipeId)
-    if (!recipe) return
-    recipe.ingredients.filter(i => i.type === "通常食材").forEach(ing => {
-      if (!map[ing.name]) map[ing.name] = { ...ing, amount: 0 }
-      map[ing.name].amount += ing.amount * sel.portion
+    const r = recipes.find(r => r.id === sel.recipeId)
+    if (!r) return
+    r.ingredients.filter(i => i.type === "調味料").forEach(ing => {
+      const key = ing.name
+      if (!map[key]) map[key] = { ...ing, totalAmount: 0, recipes: [] }
+      map[key].totalAmount += (Number(ing.amount) || 0) * sel.portion
+      if (!map[key].recipes.includes(r.name)) map[key].recipes.push(r.name)
     })
   })
   return Object.values(map)
 }
 
-// ログイン状態をlocalStorageに保存・読み込み
 const LS_KEY = "kondate_uid"
 function getSavedUid() { try { return localStorage.getItem(LS_KEY) || null } catch { return null } }
 function saveUid(uid) { try { localStorage.setItem(LS_KEY, uid) } catch {} }
 function clearUid() { try { localStorage.removeItem(LS_KEY) } catch {} }
 
+// ── CSS ──
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&family=Zen+Old+Mincho:wght@400;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -101,12 +109,15 @@ body{background:#f8f5f0;}
 .btn-outline:hover{background:#f5ede0;}
 .btn-ghost{background:transparent;color:#8a7050;border:none;padding:6px 10px;font-size:13px;cursor:pointer;}
 .btn-sm{padding:6px 12px;font-size:12px;border-radius:8px;}
+.btn-icon{background:none;border:none;cursor:pointer;padding:4px 8px;font-size:16px;color:#8a7050;border-radius:6px;}
+.btn-icon:hover{background:#f0e8d8;}
 .tag{display:inline-flex;align-items:center;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;}
 .tag-主菜{background:#fde8e0;color:#c0391b;}
 .tag-副菜{background:#e0f0e8;color:#1b7a3e;}
 .tag-お弁当{background:#e8e4f8;color:#4a2fa0;}
 input,select,textarea{font-family:inherit;border:1.5px solid #e0d4c0;border-radius:10px;padding:10px 13px;font-size:14px;width:100%;background:#fdfaf6;color:#1a1208;outline:none;transition:border .15s;}
 input:focus,select:focus,textarea:focus{border-color:#3d2b08;box-shadow:0 0 0 3px rgba(61,43,8,0.07);}
+input[type=date]{cursor:pointer;}
 .overlay{position:fixed;inset:0;background:rgba(26,18,8,.55);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
 .sheet{background:#fdfaf6;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;padding:24px 20px 40px;animation:slideUp .25s;}
 .detail-sheet{background:#fdfaf6;border-radius:20px 20px 0 0;width:100%;max-width:480px;height:88vh;overflow-y:auto;animation:slideUp .25s;}
@@ -147,6 +158,11 @@ input:focus,select:focus,textarea:focus{border-color:#3d2b08;box-shadow:0 0 0 3p
 .url-btn{display:flex;align-items:center;gap:8px;background:#fff7ed;border:1.5px solid #e8c87a;border-radius:12px;padding:12px 16px;color:#8a6010;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;width:100%;text-decoration:none;}
 .url-btn:hover{background:#fff0d0;}
 .spinner{width:36px;height:36px;border:3px solid #e8dcc8;border-top-color:#3d2b08;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
+.spinner-sm{width:18px;height:18px;border:2px solid #e8dcc8;border-top-color:#3d2b08;border-radius:50%;animation:spin .8s linear infinite;display:inline-block;}
+.date-entry{background:#fff;border-radius:12px;border:1.5px solid #e8dcc8;margin-bottom:8px;overflow:hidden;}
+.date-entry-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fdfaf6;border-bottom:1px solid #f0e8d8;}
+.skip-badge{background:#f0e8d8;color:#8a7050;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;}
+.ai-badge{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;}
 `
 
 // ── ログイン画面 ──
@@ -156,7 +172,6 @@ function LoginScreen({ onLogin }) {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-
   const handle = async () => {
     setError("")
     if (!username.trim() || !password.trim()) { setError("ユーザー名とパスワードを入力してください"); return }
@@ -164,26 +179,22 @@ function LoginScreen({ onLogin }) {
     if (password.length < 4) { setError("パスワードは4文字以上で入力してください"); return }
     setLoading(true)
     try {
-      const uid = username.trim().toLowerCase()
-      const hash = await hashPassword(password)
+      const uid = username.trim().toLowerCase(), hash = await hashPassword(password)
       if (mode === "register") {
         const existing = await getUser(uid)
         if (existing) { setError("そのユーザー名は既に使われています"); setLoading(false); return }
-        const initData = { recipes: SAMPLE_RECIPES, history: [], weeklySelections: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] }
-        await createUser(uid, hash, initData)
-        saveUid(uid)
-        onLogin(uid, initData)
+        const initData = { recipes: SAMPLE_RECIPES, planEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], history: [] }
+        await createUser(uid, hash, initData); saveUid(uid); onLogin(uid, initData)
       } else {
         const user = await getUser(uid)
         if (!user) { setError("ユーザー名が見つかりません"); setLoading(false); return }
         if (user.password_hash !== hash) { setError("パスワードが違います"); setLoading(false); return }
         saveUid(uid)
-        onLogin(uid, user.data || { recipes: SAMPLE_RECIPES, history: [], weeklySelections: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] })
+        onLogin(uid, user.data || { recipes: SAMPLE_RECIPES, planEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], history: [] })
       }
     } catch (e) { setError("エラーが発生しました: " + e.message) }
     setLoading(false)
   }
-
   return (
     <div className="login-wrap">
       <div style={{ marginBottom: 32, textAlign: "center" }}>
@@ -197,18 +208,10 @@ function LoginScreen({ onLogin }) {
           <button className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setError("") }}>新規登録</button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: "#8a7050", display: "block", marginBottom: 4 }}>ユーザー名</label>
-            <input placeholder="例: hanako" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === "Enter" && handle()} autoCapitalize="none" autoCorrect="off" />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: "#8a7050", display: "block", marginBottom: 4 }}>パスワード</label>
-            <input type="password" placeholder="4文字以上" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handle()} />
-          </div>
+          <div><label style={{ fontSize: 11, fontWeight: 700, color: "#8a7050", display: "block", marginBottom: 4 }}>ユーザー名</label><input placeholder="例: hanako" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === "Enter" && handle()} autoCapitalize="none" autoCorrect="off" /></div>
+          <div><label style={{ fontSize: 11, fontWeight: 700, color: "#8a7050", display: "block", marginBottom: 4 }}>パスワード</label><input type="password" placeholder="4文字以上" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handle()} /></div>
           {error && <div className="error-msg">⚠️ {error}</div>}
-          <button className="btn btn-primary" style={{ width: "100%", padding: "13px", marginTop: 4 }} onClick={handle} disabled={loading}>
-            {loading ? "処理中..." : mode === "login" ? "ログイン" : "アカウントを作成"}
-          </button>
+          <button className="btn btn-primary" style={{ width: "100%", padding: "13px", marginTop: 4 }} onClick={handle} disabled={loading}>{loading ? "処理中..." : mode === "login" ? "ログイン" : "アカウントを作成"}</button>
         </div>
         {mode === "register" && <div style={{ marginTop: 16, fontSize: 11, color: "#b09070", textAlign: "center", lineHeight: 1.7 }}>登録したアカウントで<br />スマホ・PCどこからでも使えます</div>}
       </div>
@@ -235,50 +238,28 @@ function RecipeDetailSheet({ recipe, onClose, onEdit }) {
           <h2 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 24, fontWeight: 700, marginBottom: 6 }}>{recipe.name}</h2>
           {recipe.memo && <p style={{ fontSize: 13, color: "#d4b88a", lineHeight: 1.6 }}>💬 {recipe.memo}</p>}
         </div>
-        {recipe.url && (
-          <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0e8d8" }}>
-            <a href={recipe.url} target="_blank" rel="noopener noreferrer" className="url-btn">
-              <span style={{ fontSize: 18 }}>▶️</span>
-              <span>参考動画・レシピを見る</span>
-              <span style={{ marginLeft: "auto", fontSize: 11, color: "#b09070" }}>外部リンク →</span>
-            </a>
-          </div>
-        )}
+        {recipe.url && <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0e8d8" }}><a href={recipe.url} target="_blank" rel="noopener noreferrer" className="url-btn"><span style={{ fontSize: 18 }}>▶️</span><span>参考動画・レシピを見る</span><span style={{ marginLeft: "auto", fontSize: 11, color: "#b09070" }}>外部リンク →</span></a></div>}
         <div style={{ display: "flex", borderBottom: "2px solid #f0e8d8", background: "#fff" }}>
           {[{ id: "steps", label: "👨‍🍳 作り方" }, { id: "ingredients", label: "🥬 材料" }].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, border: "none", background: "none", padding: "13px", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: activeTab === t.id ? "#3d2b08" : "#b09070", borderBottom: activeTab === t.id ? "2px solid #3d2b08" : "2px solid transparent", marginBottom: -2, transition: "all .15s" }}>{t.label}</button>
           ))}
         </div>
-        {activeTab === "steps" && (
-          <div style={{ padding: "20px 16px" }}>
-            {(!recipe.steps || !recipe.steps.length)
-              ? <div style={{ textAlign: "center", padding: "40px 20px", color: "#b09070" }}><div style={{ fontSize: 36, marginBottom: 10 }}>📝</div><div>作り方が登録されていません</div><div style={{ fontSize: 12, marginTop: 6 }}>編集から追加できます</div></div>
-              : recipe.steps.map((step, i) => (
-                <div key={i} className="step-row">
-                  <div className="step-num">{i + 1}</div>
-                  <div className="step-text">{step}</div>
-                </div>
-              ))}
+        {activeTab === "steps" && <div style={{ padding: "20px 16px" }}>
+          {(!recipe.steps || !recipe.steps.length) ? <div style={{ textAlign: "center", padding: "40px 20px", color: "#b09070" }}><div style={{ fontSize: 36, marginBottom: 10 }}>📝</div><div>作り方が登録されていません</div></div>
+            : recipe.steps.map((step, i) => <div key={i} className="step-row"><div className="step-num">{i + 1}</div><div className="step-text">{step}</div></div>)}
+        </div>}
+        {activeTab === "ingredients" && <div style={{ padding: "20px 16px" }}>
+          <div style={{ fontSize: 12, color: "#b09070", marginBottom: 14 }}>基本 2人前</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+            {recipe.ingredients.filter(i => i.type === "通常食材").map((ing, i) => <div key={i} className="ing-chip"><span>{ing.name}</span><span className="ing-amount">{ing.amount}{ing.unit}</span></div>)}
           </div>
-        )}
-        {activeTab === "ingredients" && (
-          <div style={{ padding: "20px 16px" }}>
-            <div style={{ fontSize: 12, color: "#b09070", marginBottom: 14 }}>基本 2人前</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-              {recipe.ingredients.filter(i => i.type === "通常食材").map((ing, i) => (
-                <div key={i} className="ing-chip"><span>{ing.name}</span><span className="ing-amount">{ing.amount}{ing.unit}</span></div>
-              ))}
+          {recipe.ingredients.some(i => i.type === "調味料") && <>
+            <div style={{ fontSize: 12, color: "#b09070", marginBottom: 10, fontWeight: 700 }}>調味料</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {recipe.ingredients.filter(i => i.type === "調味料").map((ing, i) => <div key={i} className="ing-chip" style={{ background: "#f5f0fa", borderColor: "#d8cce8" }}><span>{ing.name}</span><span className="ing-amount" style={{ color: "#6a3fa0" }}>{ing.amount}{ing.unit}</span></div>)}
             </div>
-            {recipe.ingredients.some(i => i.type === "調味料") && <>
-              <div style={{ fontSize: 12, color: "#b09070", marginBottom: 10, fontWeight: 700, letterSpacing: "0.08em" }}>調味料</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {recipe.ingredients.filter(i => i.type === "調味料").map((ing, i) => (
-                  <div key={i} className="ing-chip" style={{ background: "#f5f0fa", borderColor: "#d8cce8" }}><span>{ing.name}</span><span className="ing-amount" style={{ color: "#6a3fa0" }}>{ing.amount}{ing.unit}</span></div>
-                ))}
-              </div>
-            </>}
-          </div>
-        )}
+          </>}
+        </div>}
       </div>
     </div>
   )
@@ -287,54 +268,47 @@ function RecipeDetailSheet({ recipe, onClose, onEdit }) {
 // ── メインアプリ ──
 export default function App() {
   const [userId, setUserId] = useState(null)
-  const [autoLogging, setAutoLogging] = useState(true) // 自動ログイン中フラグ
+  const [autoLogging, setAutoLogging] = useState(true)
   const [screen, setScreen] = useState("catalog")
   const [recipes, setRecipes] = useState([])
-  const [history, setHistory] = useState([])
-  const [weeklySelections, setWeeklySelections] = useState([])
+  // planEntries: [{id, date, recipeId, portion, skip}]
+  const [planEntries, setPlanEntries] = useState([])
   const [seasoningChecks, setSeasoningChecks] = useState({})
   const [shoppingAdjust, setShoppingAdjust] = useState({})
   const [deletedItems, setDeletedItems] = useState(new Set())
+  const [history, setHistory] = useState([])
   const [filterTag, setFilterTag] = useState("すべて")
   const [filterFav, setFilterFav] = useState(false)
   const [editRecipe, setEditRecipe] = useState(null)
   const [showRegister, setShowRegister] = useState(false)
   const [detailRecipe, setDetailRecipe] = useState(null)
   const [expandedHistory, setExpandedHistory] = useState(null)
+  const [editingHistory, setEditingHistory] = useState(null)
   const [toast, setToast] = useState(null)
   const saveTimer = useRef(null)
 
-  const showToast = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 2200) }
+  const showToast = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 2500) }
 
-  // ── 起動時に自動ログイン ──
   useEffect(() => {
     const uid = getSavedUid()
     if (!uid) { setAutoLogging(false); return }
     getUser(uid).then(user => {
       if (user) {
-        const data = user.data || { recipes: SAMPLE_RECIPES, history: [], weeklySelections: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] }
-        setUserId(uid)
-        setRecipes(data.recipes || SAMPLE_RECIPES)
-        setHistory(data.history || [])
-        setWeeklySelections(data.weeklySelections || [])
-        setSeasoningChecks(data.seasoningChecks || {})
-        setShoppingAdjust(data.shoppingAdjust || {})
-        setDeletedItems(new Set(data.deletedItems || []))
-      } else {
-        clearUid()
-      }
+        const d = user.data || {}
+        setUserId(uid); setRecipes(d.recipes || SAMPLE_RECIPES)
+        setPlanEntries(d.planEntries || [])
+        setSeasoningChecks(d.seasoningChecks || {}); setShoppingAdjust(d.shoppingAdjust || {})
+        setDeletedItems(new Set(d.deletedItems || [])); setHistory(d.history || [])
+      } else { clearUid() }
       setAutoLogging(false)
     }).catch(() => { clearUid(); setAutoLogging(false) })
   }, [])
 
   const handleLogin = (uid, data) => {
-    setUserId(uid)
-    setRecipes(data.recipes || SAMPLE_RECIPES)
-    setHistory(data.history || [])
-    setWeeklySelections(data.weeklySelections || [])
-    setSeasoningChecks(data.seasoningChecks || {})
-    setShoppingAdjust(data.shoppingAdjust || {})
-    setDeletedItems(new Set(data.deletedItems || []))
+    setUserId(uid); setRecipes(data.recipes || SAMPLE_RECIPES)
+    setPlanEntries(data.planEntries || [])
+    setSeasoningChecks(data.seasoningChecks || {}); setShoppingAdjust(data.shoppingAdjust || {})
+    setDeletedItems(new Set(data.deletedItems || [])); setHistory(data.history || [])
     setScreen("catalog")
   }
 
@@ -348,10 +322,11 @@ export default function App() {
   }, [userId])
 
   const buildSave = useCallback((overrides = {}) => ({
-    recipes, history, weeklySelections, seasoningChecks,
-    shoppingAdjust, deletedItems: [...deletedItems], ...overrides,
-  }), [recipes, history, weeklySelections, seasoningChecks, shoppingAdjust, deletedItems])
+    recipes, planEntries, seasoningChecks, shoppingAdjust,
+    deletedItems: [...deletedItems], history, ...overrides,
+  }), [recipes, planEntries, seasoningChecks, shoppingAdjust, deletedItems, history])
 
+  // ── レシピ操作 ──
   const toggleFavorite = id => { const next = recipes.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r); setRecipes(next); triggerSave(buildSave({ recipes: next })) }
   const saveRecipe = recipe => {
     const next = recipe.id ? recipes.map(r => r.id === recipe.id ? recipe : r) : [...recipes, { ...recipe, id: Date.now() }]
@@ -360,29 +335,70 @@ export default function App() {
     if (detailRecipe && recipe.id === detailRecipe.id) setDetailRecipe(recipe)
   }
   const deleteRecipe = id => {
-    const nextR = recipes.filter(r => r.id !== id), nextW = weeklySelections.filter(s => s.recipeId !== id)
-    setRecipes(nextR); setWeeklySelections(nextW); triggerSave(buildSave({ recipes: nextR, weeklySelections: nextW }))
+    const nextR = recipes.filter(r => r.id !== id), nextP = planEntries.filter(e => e.recipeId !== id)
+    setRecipes(nextR); setPlanEntries(nextP); triggerSave(buildSave({ recipes: nextR, planEntries: nextP }))
     if (detailRecipe?.id === id) setDetailRecipe(null)
   }
-  const toggleWeeklyMenu = (day, recipeId) => {
-    const exists = weeklySelections.find(s => s.day === day && s.recipeId === recipeId)
-    const next = exists ? weeklySelections.filter(s => !(s.day === day && s.recipeId === recipeId)) : [...weeklySelections, { day, recipeId, portion: 1 }]
-    setWeeklySelections(next); triggerSave(buildSave({ weeklySelections: next }))
+
+  // ── プラン操作 ──
+  const sortedEntries = useMemo(() => [...planEntries].sort((a, b) => (a.date || "").localeCompare(b.date || "")), [planEntries])
+
+  const addPlanEntry = () => {
+    const lastDate = sortedEntries.length > 0 ? sortedEntries[sortedEntries.length - 1].date : null
+    let nextDate = ""
+    if (lastDate) {
+      const d = new Date(lastDate); d.setDate(d.getDate() + 1)
+      nextDate = d.toISOString().slice(0, 10)
+    }
+    const entry = { id: Date.now(), date: nextDate, recipeId: null, portion: 1, skip: false }
+    const next = [...planEntries, entry]
+    setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
   }
-  const setWeeklyPortion = (day, recipeId, portion) => { const next = weeklySelections.map(s => s.day === day && s.recipeId === recipeId ? { ...s, portion } : s); setWeeklySelections(next); triggerSave(buildSave({ weeklySelections: next })) }
-  const toggleSeasoningCheck = name => { const next = { ...seasoningChecks, [name]: !seasoningChecks[name] }; setSeasoningChecks(next); triggerSave(buildSave({ seasoningChecks: next })) }
 
-  const weeklySeasonings = useMemo(() => {
-    const map = {}
-    weeklySelections.forEach(sel => { const r = recipes.find(r => r.id === sel.recipeId); if (!r) return; r.ingredients.filter(i => i.type === "調味料").forEach(ing => { map[ing.name] = ing }) })
-    return Object.values(map)
-  }, [weeklySelections, recipes])
+  const updateEntry = (id, patch) => {
+    const next = planEntries.map(e => e.id === id ? { ...e, ...patch } : e)
+    setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
+  }
 
+  const removeEntry = id => {
+    const next = planEntries.filter(e => e.id !== id)
+    setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
+  }
+
+  const moveEntry = (id, dir) => {
+    const sorted = [...sortedEntries]
+    const idx = sorted.findIndex(e => e.id === id)
+    if (dir === -1 && idx === 0) return
+    if (dir === 1 && idx === sorted.length - 1) return
+    const swapIdx = idx + dir
+    const a = sorted[idx], b = sorted[swapIdx]
+    // 日付を交換
+    const next = planEntries.map(e => {
+      if (e.id === a.id) return { ...e, date: b.date }
+      if (e.id === b.id) return { ...e, date: a.date }
+      return e
+    })
+    setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
+  }
+
+  // ── 調味料 ──
+  const allSeasonings = useMemo(() => {
+    const activeSels = planEntries.filter(e => !e.skip && e.recipeId).map(e => ({ recipeId: e.recipeId, portion: e.portion }))
+    return mergeSeasonings(activeSels, recipes)
+  }, [planEntries, recipes])
+
+  const toggleSeasoningCheck = name => {
+    const next = { ...seasoningChecks, [name]: !seasoningChecks[name] }
+    setSeasoningChecks(next); triggerSave(buildSave({ seasoningChecks: next }))
+  }
+
+  // ── 買い物リスト ──
   const baseShoppingList = useMemo(() => {
-    const merged = mergeIngredients(weeklySelections, recipes)
-    const seasonings = weeklySeasonings.filter(s => seasoningChecks[s.name]).map(s => ({ ...s, amount: "適量", isSeasoning: true }))
+    const activeSels = planEntries.filter(e => !e.skip && e.recipeId).map(e => ({ recipeId: e.recipeId, portion: e.portion }))
+    const merged = mergeIngredientsAdvanced(activeSels, recipes)
+    const seasonings = allSeasonings.filter(s => seasoningChecks[s.name]).map(s => ({ ...s, amount: s.totalAmount || "適量", isSeasoning: true }))
     return [...merged, ...seasonings]
-  }, [weeklySelections, recipes, seasoningChecks, weeklySeasonings])
+  }, [planEntries, recipes, seasoningChecks, allSeasonings])
 
   const shoppingList = useMemo(() => baseShoppingList
     .filter(i => !deletedItems.has(i.name))
@@ -392,39 +408,41 @@ export default function App() {
 
   const adjustShopping = (name, delta, unit) => {
     const step = ["個","本","袋","枚","パック","片","束"].includes(unit) ? 1 : 10
-    const cur = shoppingAdjust[name] !== undefined ? shoppingAdjust[name] : (baseShoppingList.find(i => i.name === name)?.amount || 0)
-    const next = { ...shoppingAdjust, [name]: Math.max(0, cur + delta * step) }
+    const cur = shoppingAdjust[name] !== undefined ? shoppingAdjust[name] : (Number(baseShoppingList.find(i => i.name === name)?.amount) || 0)
+    const next = { ...shoppingAdjust, [name]: Math.max(0, Math.round((cur + delta * step) * 10) / 10) }
     setShoppingAdjust(next); triggerSave(buildSave({ shoppingAdjust: next }))
   }
   const removeShoppingItem = name => { const next = new Set([...deletedItems, name]); setDeletedItems(next); triggerSave(buildSave({ deletedItems: [...next] })) }
 
-  const confirmWeek = () => {
-    const menus = weeklySelections.map(s => { const r = recipes.find(r => r.id === s.recipeId); return { day: s.day, name: r ? r.name : "不明", portion: s.portion } }).sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day))
-    const newHistory = [{ id: Date.now(), weekLabel: getWeekLabel(), menus }, ...history]
-    setHistory(newHistory); setWeeklySelections([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set())
-    triggerSave(buildSave({ history: newHistory, weeklySelections: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] }))
+  // ── 確定 ──
+  const confirmPlan = () => {
+    const menus = sortedEntries.map(e => {
+      const r = recipes.find(r => r.id === e.recipeId)
+      return { date: e.date, name: e.skip ? "（外食・スキップ）" : r ? r.name : "未設定", portion: e.portion, skip: e.skip }
+    })
+    const label = formatPeriodLabel(sortedEntries)
+    const newHistory = [{ id: Date.now(), label, menus, entries: sortedEntries }, ...history]
+    setHistory(newHistory); setPlanEntries([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set())
+    triggerSave(buildSave({ history: newHistory, planEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] }))
     setScreen("history")
   }
 
-  const logout = () => { clearUid(); setUserId(null); setRecipes([]); setHistory([]); setWeeklySelections([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set()) }
+  const logout = () => { clearUid(); setUserId(null); setRecipes([]); setPlanEntries([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set()); setHistory([]) }
 
-  // 自動ログイン中はスピナー表示
   if (autoLogging) return (
-    <>
-      <style>{CSS}</style>
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f8f5f0" }}>
-        <div style={{ fontSize: 48, marginBottom: 20 }}>🥢</div>
-        <div className="spinner" />
-        <div style={{ fontSize: 13, color: "#b09070" }}>データを読み込んでいます...</div>
-      </div>
-    </>
+    <><style>{CSS}</style>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f8f5f0" }}>
+      <div style={{ fontSize: 48, marginBottom: 20 }}>🥢</div>
+      <div className="spinner" />
+      <div style={{ fontSize: 13, color: "#b09070" }}>データを読み込んでいます...</div>
+    </div></>
   )
 
   if (!userId) return (<><style>{CSS}</style><LoginScreen onLogin={handleLogin} /></>)
 
   const navItems = [
     { id: "catalog", icon: "📋", label: "カタログ" },
-    { id: "weekly", icon: "📅", label: "今週" },
+    { id: "plan", icon: "📅", label: "献立" },
     { id: "seasoning", icon: "🧂", label: "調味料" },
     { id: "shopping", icon: "🛒", label: "買い物" },
     { id: "history", icon: "📖", label: "履歴" },
@@ -450,6 +468,7 @@ export default function App() {
 
       <div className="screen" style={{ flex: 1 }}>
 
+        {/* ── カタログ ── */}
         {screen === "catalog" && (
           <div style={{ padding: "16px 16px 0" }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -468,6 +487,7 @@ export default function App() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: r.memo ? 3 : 0 }}>
                           <span style={{ fontWeight: 700, fontSize: 15 }}>{r.name}</span>
                           <span className={`tag tag-${r.tag}`}>{r.tag}</span>
+                          {r.aiGenerated && <span className="ai-badge">AI</span>}
                         </div>
                         {r.memo && <div style={{ fontSize: 11, color: "#a08870", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.memo}</div>}
                       </div>
@@ -485,60 +505,86 @@ export default function App() {
           </div>
         )}
 
-        {screen === "weekly" && (
+        {/* ── 献立プラン ── */}
+        {screen === "plan" && (
           <div style={{ padding: "16px 16px 0" }}>
-            <div style={{ marginBottom: 14, fontSize: 13, color: "#8a7050" }}>曜日ごとにメニューを選んで分量を設定してね</div>
-            {DAYS.map(day => {
-              const daySel = weeklySelections.filter(s => s.day === day)
-              return (
-                <div key={day} style={{ marginBottom: 10 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: "#3d2b08", marginBottom: 5, display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ background: "#3d2b08", color: "#fff", borderRadius: "50%", width: 26, height: 26, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{day}</span>
-                    <span>曜日</span>
+            <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 13, color: "#8a7050" }}>日付を選んでメニューを設定してね</div>
+              <button className="btn btn-outline btn-sm" onClick={addPlanEntry}>＋ 日を追加</button>
+            </div>
+
+            {sortedEntries.length === 0 && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>📅</div><div>「＋ 日を追加」から始めよう</div></div>}
+
+            {sortedEntries.map((entry, idx) => (
+              <div key={entry.id} className="date-entry">
+                <div className="date-entry-header">
+                  {/* 上下移動 */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(entry.id, -1)} disabled={idx === 0}>▲</button>
+                    <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(entry.id, 1)} disabled={idx === sortedEntries.length - 1}>▼</button>
                   </div>
-                  <div className="card" style={{ overflow: "hidden" }}>
-                    {!daySel.length && <div style={{ padding: "9px 16px", color: "#c0a880", fontSize: 13 }}>未選択</div>}
-                    {daySel.map(sel => {
-                      const r = recipes.find(r => r.id === sel.recipeId)
-                      if (!r) return null
-                      return (
-                        <div key={sel.recipeId} className="item-row">
-                          <span className={`tag tag-${r.tag}`}>{r.tag}</span>
-                          <span style={{ flex: 1, fontWeight: 500, fontSize: 14, cursor: "pointer", textDecoration: "underline", textDecorationColor: "#d4c5b0" }} onClick={() => setDetailRecipe(r)}>{r.name}</span>
-                          <select className="portion-select" value={sel.portion} onChange={e => setWeeklyPortion(day, sel.recipeId, Number(e.target.value))}>
-                            <option value={1}>1日分（2人前）</option>
-                            <option value={2}>2日分（4人前）</option>
-                            <option value={3}>3日分（6人前）</option>
-                          </select>
-                          <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => toggleWeeklyMenu(day, sel.recipeId)}>✕</button>
-                        </div>
-                      )
-                    })}
-                    <div style={{ padding: "7px 12px", borderTop: daySel.length ? "1px solid #f0e8d8" : "none" }}>
-                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        {recipes.filter(r => !daySel.find(s => s.recipeId === r.id)).map(r => (
-                          <button key={r.id} className="pill-btn" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => toggleWeeklyMenu(day, r.id)}>＋ {r.name}</button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  {/* 日付 */}
+                  <input type="date" value={entry.date || ""} onChange={e => updateEntry(entry.id, { date: e.target.value })}
+                    style={{ width: 150, fontSize: 13, padding: "6px 10px", flex: "0 0 auto" }} />
+                  <div style={{ fontSize: 13, color: "#8a7050", minWidth: 80 }}>{entry.date ? formatDateLabel(entry.date) : "日付未設定"}</div>
+                  {/* スキップトグル */}
+                  <button onClick={() => updateEntry(entry.id, { skip: !entry.skip })} style={{ marginLeft: "auto", background: entry.skip ? "#f0e8d8" : "none", border: "1.5px solid #d4c5b0", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: entry.skip ? "#8a7050" : "#c0a880", fontWeight: 600 }}>
+                    {entry.skip ? "スキップ中" : "スキップ"}
+                  </button>
+                  <button className="btn-icon" style={{ color: "#c0391b" }} onClick={() => removeEntry(entry.id)}>✕</button>
                 </div>
-              )
-            })}
-            {weeklySelections.length > 0 && <button className="btn btn-primary" style={{ width: "100%", padding: "13px", marginTop: 12 }} onClick={() => setScreen("seasoning")}>調味料チェックへ進む →</button>}
+
+                {!entry.skip && (
+                  <div style={{ padding: "10px 14px" }}>
+                    <div style={{ marginBottom: 8 }}>
+                      <select value={entry.recipeId || ""} onChange={e => updateEntry(entry.id, { recipeId: e.target.value ? Number(e.target.value) : null })}
+                        style={{ fontSize: 13, padding: "8px 10px" }}>
+                        <option value="">── レシピを選択 ──</option>
+                        {recipes.map(r => <option key={r.id} value={r.id}>{r.name}（{r.tag}）</option>)}
+                      </select>
+                    </div>
+                    {entry.recipeId && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <select className="portion-select" value={entry.portion} onChange={e => updateEntry(entry.id, { portion: Number(e.target.value) })}>
+                          <option value={1}>1日分（2人前）</option>
+                          <option value={2}>2日分（4人前）</option>
+                          <option value={3}>3日分（6人前）</option>
+                        </select>
+                        <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => setDetailRecipe(recipes.find(r => r.id === entry.recipeId))}>レシピ確認 →</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {entry.skip && <div style={{ padding: "10px 14px", fontSize: 13, color: "#c0a880" }}>外食・お休みの日</div>}
+              </div>
+            ))}
+
+            {planEntries.some(e => !e.skip && e.recipeId) && (
+              <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setScreen("seasoning")}>調味料チェックへ →</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={confirmPlan}>確定して保存</button>
+              </div>
+            )}
           </div>
         )}
 
+        {/* ── 調味料チェック（分量表示付き） ── */}
         {screen === "seasoning" && (
           <div style={{ padding: "16px 16px 0" }}>
-            <div style={{ marginBottom: 14, fontSize: 13, color: "#8a7050" }}>今週のメニューで使う調味料です。<br />家にない・買い足したいものにチェックを入れてね ✓</div>
+            <div style={{ marginBottom: 14, fontSize: 13, color: "#8a7050" }}>今回のメニューで使う調味料です。<br />家にない・買い足したいものにチェックを入れてね ✓</div>
             <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
-              {!weeklySeasonings.length && <div style={{ padding: "20px", color: "#c0a880", fontSize: 13, textAlign: "center" }}>今週のメニューを選択してください</div>}
-              {weeklySeasonings.map(s => (
+              {!allSeasonings.length && <div style={{ padding: "20px", color: "#c0a880", fontSize: 13, textAlign: "center" }}>献立タブでメニューを設定してください</div>}
+              {allSeasonings.map(s => (
                 <div key={s.name} className="check-row" onClick={() => toggleSeasoningCheck(s.name)}>
                   <div className={`custom-check ${seasoningChecks[s.name] ? "checked" : ""}`}>{seasoningChecks[s.name] ? "✓" : ""}</div>
-                  <div style={{ flex: 1 }}><div style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</div><div style={{ fontSize: 11, color: "#a08870" }}>{s.category}</div></div>
-                  {seasoningChecks[s.name] && <span style={{ fontSize: 11, color: "#c0391b", fontWeight: 700 }}>買い物リストへ追加</span>}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</div>
+                    <div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>
+                      合計 <strong>{Math.round(s.totalAmount * 10) / 10}{s.unit}</strong>
+                      　使用レシピ: {s.recipes.join("・")}
+                    </div>
+                  </div>
+                  {seasoningChecks[s.name] && <span style={{ fontSize: 11, color: "#c0391b", fontWeight: 700, flexShrink: 0 }}>リストへ追加</span>}
                 </div>
               ))}
             </div>
@@ -546,13 +592,14 @@ export default function App() {
           </div>
         )}
 
+        {/* ── 買い物リスト ── */}
         {screen === "shopping" && (
           <div style={{ padding: "16px 16px 0" }}>
             <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ fontSize: 13, color: "#8a7050" }}>＋−で数量を微調整できます</div>
-              {weeklySelections.length > 0 && <button className="btn btn-primary btn-sm" style={{ fontSize: 12, padding: "8px 14px" }} onClick={confirmWeek}>今週を確定して保存</button>}
+              {planEntries.some(e => !e.skip && e.recipeId) && <button className="btn btn-primary btn-sm" style={{ fontSize: 12, padding: "8px 14px" }} onClick={confirmPlan}>確定して保存</button>}
             </div>
-            {!shoppingList.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div><div>メニューを選択してください</div></div>}
+            {!shoppingList.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div><div>献立タブでメニューを設定してください</div></div>}
             {STORE_ORDER.map(cat => {
               const items = shoppingList.filter(i => i.category === cat)
               if (!items.length) return null
@@ -562,14 +609,17 @@ export default function App() {
                   <div className="card" style={{ overflow: "hidden" }}>
                     {items.map(item => (
                       <div key={item.name} className="item-row">
-                        <div style={{ flex: 1 }}><div style={{ fontWeight: 500, fontSize: 14 }}>{item.name}</div>{item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 500, fontSize: 14 }}>{item.name}</div>
+                          {item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}
+                        </div>
                         {!item.isSeasoning
                           ? <div className="num-ctrl">
                               <button className="num-btn" onClick={() => adjustShopping(item.name, -1, item.unit)}>−</button>
-                              <span style={{ minWidth: 54, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
+                              <span style={{ minWidth: 60, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
                               <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit)}>＋</button>
                             </div>
-                          : <span style={{ fontSize: 13, color: "#8a7050" }}>適量</span>}
+                          : <span style={{ fontSize: 13, color: "#8a7050" }}>{item.amount}{item.unit}</span>}
                         <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => removeShoppingItem(item.name)}>✕</button>
                       </div>
                     ))}
@@ -580,22 +630,30 @@ export default function App() {
           </div>
         )}
 
+        {/* ── 履歴 ── */}
         {screen === "history" && (
           <div style={{ padding: "16px 16px 0" }}>
             {!history.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>📖</div><div>まだ履歴がありません</div></div>}
             {history.map(week => (
               <div key={week.id} className="history-week" style={{ marginBottom: 14, background: "#fff" }}>
-                <div style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: expandedHistory === week.id ? "#faf3e8" : "#fff" }} onClick={() => setExpandedHistory(expandedHistory === week.id ? null : week.id)}>
-                  <div><div style={{ fontWeight: 700, fontSize: 14 }}>{week.weekLabel}</div><div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>{week.menus.length}メニュー</div></div>
-                  <span style={{ color: "#8a7050" }}>{expandedHistory === week.id ? "▲" : "▼"}</span>
+                <div style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: expandedHistory === week.id ? "#faf3e8" : "#fff" }}
+                  onClick={() => setExpandedHistory(expandedHistory === week.id ? null : week.id)}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{week.label}</div>
+                    <div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>{week.menus.length}日分</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={e => { e.stopPropagation(); setEditingHistory(week) }}>✏️ 編集</button>
+                    <span style={{ color: "#8a7050" }}>{expandedHistory === week.id ? "▲" : "▼"}</span>
+                  </div>
                 </div>
                 {expandedHistory === week.id && (
                   <div style={{ borderTop: "1px solid #f0e8d8" }}>
                     {week.menus.map((m, i) => (
                       <div key={i} className="item-row">
-                        <span style={{ background: "#3d2b08", color: "#fff", borderRadius: "50%", width: 24, height: 24, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 }}>{m.day}</span>
-                        <span style={{ flex: 1, fontSize: 14 }}>{m.name}</span>
-                        <span style={{ fontSize: 11, color: "#a08870" }}>{m.portion === 1 ? "1日分" : `${m.portion}日分`}</span>
+                        <span style={{ fontSize: 12, color: "#8a7050", minWidth: 80 }}>{m.date ? formatDateLabel(m.date) : `${i+1}日目`}</span>
+                        <span style={{ flex: 1, fontSize: 14, color: m.skip ? "#c0a880" : "#1a1208" }}>{m.name}</span>
+                        {!m.skip && <span style={{ fontSize: 11, color: "#a08870" }}>{m.portion === 1 ? "1日分" : `${m.portion}日分`}</span>}
                       </div>
                     ))}
                   </div>
@@ -618,15 +676,58 @@ export default function App() {
 
       {detailRecipe && <RecipeDetailSheet recipe={detailRecipe} onClose={() => setDetailRecipe(null)} onEdit={() => { setEditRecipe(detailRecipe); setShowRegister(true); setDetailRecipe(null) }} />}
       {showRegister && <RegisterSheet recipe={editRecipe} onSave={saveRecipe} onClose={() => { setShowRegister(false); setEditRecipe(null) }} />}
+      {editingHistory && <HistoryEditSheet historyItem={editingHistory} recipes={recipes} onSave={updated => {
+        const next = history.map(h => h.id === updated.id ? updated : h)
+        setHistory(next); triggerSave(buildSave({ history: next })); setEditingHistory(null)
+      }} onClose={() => setEditingHistory(null)} />}
     </div>
   )
 }
 
-// ── レシピ登録シート ──
+// ── 履歴編集シート ──
+function HistoryEditSheet({ historyItem, recipes, onSave, onClose }) {
+  const [menus, setMenus] = useState(historyItem.menus.map(m => ({ ...m })))
+  const updateMenu = (i, patch) => setMenus(ms => ms.map((m, j) => j === i ? { ...m, ...patch } : m))
+  return (
+    <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="sheet">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 18, fontWeight: 700 }}>履歴を編集</h3>
+          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+        </div>
+        <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 14 }}>{historyItem.label}</div>
+        {menus.map((m, i) => (
+          <div key={i} style={{ background: "#faf5ee", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 6 }}>{m.date ? formatDateLabel(m.date) : `${i+1}日目`}</div>
+            {!m.skip
+              ? <select value={recipes.find(r => r.name === m.name)?.id || ""} onChange={e => {
+                  const r = recipes.find(r => r.id === Number(e.target.value))
+                  updateMenu(i, { name: r ? r.name : m.name })
+                }} style={{ fontSize: 13, padding: "7px 10px" }}>
+                  <option value="">── 選択 ──</option>
+                  {recipes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              : <div style={{ fontSize: 13, color: "#c0a880" }}>外食・スキップ</div>}
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
+          <button className="btn btn-outline" style={{ flex: 1 }} onClick={onClose}>キャンセル</button>
+          <button className="btn btn-primary" style={{ flex: 2, padding: "13px" }} onClick={() => onSave({ ...historyItem, menus })}>保存する</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── レシピ登録シート（Gemini連携付き） ──
 function RegisterSheet({ recipe, onSave, onClose }) {
   const blank = { name: "", tag: "主菜", favorite: false, memo: "", url: "", steps: [""], ingredients: [{ name: "", amount: "", unit: "g", type: "通常食材", category: "野菜・果物" }] }
   const [form, setForm] = useState(() => { if (!recipe) return blank; const r = JSON.parse(JSON.stringify(recipe)); if (!r.steps) r.steps = [""]; return r })
   const [regTab, setRegTab] = useState("basic")
+  const [aiUrl, setAiUrl] = useState("")
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState("")
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const setStep = (i, v) => setForm(f => ({ ...f, steps: f.steps.map((s, j) => j === i ? v : s) }))
   const addStep = () => setForm(f => ({ ...f, steps: [...f.steps, ""] }))
@@ -636,6 +737,30 @@ function RegisterSheet({ recipe, onSave, onClose }) {
   const removeIng = i => setForm(f => ({ ...f, ingredients: f.ingredients.filter((_, j) => j !== i) }))
   const tabStyle = id => ({ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: regTab === id ? "#3d2b08" : "#b09070", borderBottom: regTab === id ? "2px solid #3d2b08" : "2px solid transparent", transition: "all .15s" })
 
+  const handleAiExtract = async () => {
+    if (!aiUrl.trim()) return
+    setAiLoading(true); setAiError("")
+    try {
+      const result = await extractRecipeFromUrl(aiUrl.trim())
+      setForm({
+        name: result.recipeName || "",
+        tag: "主菜", favorite: false,
+        memo: result.memo || "",
+        url: aiUrl.trim(),
+        steps: result.steps?.length ? result.steps : [""],
+        ingredients: result.ingredients?.map(ing => ({
+          name: ing.name || "", amount: ing.amount || "", unit: ing.unit || "g",
+          type: ing.type || "通常食材", category: ing.category || "野菜・果物"
+        })) || [],
+        aiGenerated: true,
+      })
+      setRegTab("basic")
+    } catch (e) {
+      setAiError("抽出に失敗しました。URLを確認するか、手動で入力してください。\n" + e.message)
+    }
+    setAiLoading(false)
+  }
+
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="sheet">
@@ -643,11 +768,30 @@ function RegisterSheet({ recipe, onSave, onClose }) {
           <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 18, fontWeight: 700 }}>{recipe ? "レシピを編集" : "レシピを追加"}</h3>
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
         </div>
+
+        {/* AI自動入力エリア */}
+        {!recipe && (
+          <div style={{ background: "linear-gradient(135deg,#eef2ff,#f5f3ff)", border: "1.5px solid #c7d2fe", borderRadius: 12, padding: "14px 16px", marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span className="ai-badge">✨ AI</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#4338ca" }}>URLからレシピを自動入力</span>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input placeholder="YouTubeやレシピサイトのURLを貼り付け" value={aiUrl} onChange={e => setAiUrl(e.target.value)} style={{ flex: 1, fontSize: 13, padding: "8px 10px", borderColor: "#c7d2fe" }} />
+              <button className="btn btn-primary btn-sm" style={{ background: "#4f46e5", whiteSpace: "nowrap" }} onClick={handleAiExtract} disabled={aiLoading}>
+                {aiLoading ? <span className="spinner-sm" /> : "解析"}
+              </button>
+            </div>
+            {aiError && <div style={{ fontSize: 11, color: "#c0391b", marginTop: 8 }}>{aiError}</div>}
+          </div>
+        )}
+
         <div style={{ display: "flex", borderBottom: "1px solid #f0e8d8", marginBottom: 18 }}>
           <button style={tabStyle("basic")} onClick={() => setRegTab("basic")}>基本情報</button>
           <button style={tabStyle("steps")} onClick={() => setRegTab("steps")}>作り方</button>
           <button style={tabStyle("ingredients")} onClick={() => setRegTab("ingredients")}>材料</button>
         </div>
+
         {regTab === "basic" && (
           <div style={{ display: "grid", gap: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "flex-end" }}>
