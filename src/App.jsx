@@ -249,7 +249,7 @@ function RecipeDetailSheet({ recipe, onClose, onEdit }) {
             : recipe.steps.map((step, i) => <div key={i} className="step-row"><div className="step-num">{i + 1}</div><div className="step-text">{step}</div></div>)}
         </div>}
         {activeTab === "ingredients" && <div style={{ padding: "20px 16px" }}>
-          <div style={{ fontSize: 12, color: "#b09070", marginBottom: 14 }}>基本 2人前</div>
+          <div style={{ fontSize: 12, color: "#b09070", marginBottom: 14 }}>基本 {recipe.servings || 2}人前</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
             {recipe.ingredients.filter(i => i.type === "通常食材").map((ing, i) => <div key={i} className="ing-chip"><span>{ing.name}</span><span className="ing-amount">{ing.amount}{ing.unit}</span></div>)}
           </div>
@@ -728,8 +728,8 @@ function HistoryEditSheet({ historyItem, recipes, onSave, onClose }) {
 
 // ── レシピ登録シート（Gemini連携付き） ──
 function RegisterSheet({ recipe, onSave, onClose }) {
-  const blank = { name: "", tag: "主菜", favorite: false, memo: "", url: "", steps: [""], ingredients: [{ name: "", amount: "", unit: "g", type: "通常食材", category: "野菜・果物" }] }
-  const [form, setForm] = useState(() => { if (!recipe) return blank; const r = JSON.parse(JSON.stringify(recipe)); if (!r.steps) r.steps = [""]; return r })
+  const blank = { name: "", tag: "主菜", favorite: false, memo: "", url: "", steps: [""], servings: 2, ingredients: [{ name: "", amount: "", unit: "g", type: "通常食材", category: "野菜・果物" }] }
+  const [form, setForm] = useState(() => { if (!recipe) return blank; const r = JSON.parse(JSON.stringify(recipe)); if (!r.steps) r.steps = [""]; if (!r.servings) r.servings = 2; return r })
   const [regTab, setRegTab] = useState("basic")
   const [aiUrl, setAiUrl] = useState("")
   const [aiText, setAiText] = useState("")
@@ -852,7 +852,13 @@ function RegisterSheet({ recipe, onSave, onClose }) {
         {regTab === "ingredients" && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: "#8a7050" }}>基本 2人前で入力してね</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ fontSize: 12, color: "#8a7050" }}>基本</div>
+                <select value={form.servings || 2} onChange={e => set("servings", Number(e.target.value))} style={{ fontSize: 13, padding: "4px 8px", width: "auto" }}>
+                  {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}人前</option>)}
+                </select>
+                <div style={{ fontSize: 12, color: "#8a7050" }}>で入力してね</div>
+              </div>
               <button className="btn btn-outline btn-sm" onClick={addIng}>＋ 追加</button>
             </div>
             {form.ingredients.map((ing, i) => (
