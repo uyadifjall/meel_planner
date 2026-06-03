@@ -276,6 +276,8 @@ export default function App() {
   const [seasoningChecks, setSeasoningChecks] = useState({})
   const [shoppingAdjust, setShoppingAdjust] = useState({})
   const [deletedItems, setDeletedItems] = useState(new Set())
+  const [checkedShoppingItems, setCheckedShoppingItems] = useState(new Set())
+  const [showConfirmPlan, setShowConfirmPlan] = useState(false)
   const [history, setHistory] = useState([])
   const [filterTag, setFilterTag] = useState("すべて")
   const [filterFav, setFilterFav] = useState(false)
@@ -335,6 +337,7 @@ export default function App() {
     if (detailRecipe && recipe.id === detailRecipe.id) setDetailRecipe(recipe)
   }
   const deleteRecipe = id => {
+    if (!window.confirm("このレシピを削除しますか？")) return
     const nextR = recipes.filter(r => r.id !== id), nextP = planEntries.filter(e => e.recipeId !== id)
     setRecipes(nextR); setPlanEntries(nextP); triggerSave(buildSave({ recipes: nextR, planEntries: nextP }))
     if (detailRecipe?.id === id) setDetailRecipe(null)
@@ -428,7 +431,8 @@ export default function App() {
     })
     const label = formatPeriodLabel(sortedEntries)
     const newHistory = [{ id: Date.now(), label, menus, entries: sortedEntries }, ...history]
-    setHistory(newHistory); setPlanEntries([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set())
+    setHistory(newHistory); setPlanEntries([]); setSeasoningChecks({}); setShoppingAdjust({})
+    setDeletedItems(new Set()); setCheckedShoppingItems(new Set()); setShowConfirmPlan(false)
     triggerSave(buildSave({ history: newHistory, planEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] }))
     setScreen("history")
   }
@@ -568,7 +572,7 @@ export default function App() {
             {planEntries.some(e => !e.skip && e.recipeId) && (
               <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setScreen("seasoning")}>調味料チェックへ →</button>
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={confirmPlan}>確定して保存</button>
+                <button className="btn btn-outline" style={{ flex: 1, borderColor: "#e8a000", color: "#8a6000" }} onClick={() => setShowConfirmPlan(true)}>🗓 今回の買い物を締める</button>
               </div>
             )}
           </div>
@@ -602,37 +606,59 @@ export default function App() {
         {screen === "shopping" && (
           <div style={{ padding: "16px 16px 0" }}>
             <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 13, color: "#8a7050" }}>＋−で数量を微調整できます</div>
-              {planEntries.some(e => !e.skip && e.recipeId) && <button className="btn btn-primary btn-sm" style={{ fontSize: 12, padding: "8px 14px" }} onClick={confirmPlan}>確定して保存</button>}
+              <div style={{ fontSize: 13, color: "#8a7050" }}>タップでチェック、＋−で数量調整</div>
+              {planEntries.some(e => !e.skip && e.recipeId) && (
+                <button className="btn btn-outline btn-sm" style={{ fontSize: 12, borderColor: "#e8a000", color: "#8a6000" }} onClick={() => setShowConfirmPlan(true)}>
+                  🗓 買い物を締める
+                </button>
+              )}
             </div>
             {!shoppingList.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div><div>献立タブでメニューを設定してください</div></div>}
             {STORE_ORDER.map(cat => {
-              const items = shoppingList.filter(i => i.category === cat)
-              if (!items.length) return null
+              const allItems = shoppingList.filter(i => i.category === cat)
+              if (!allItems.length) return null
+              const unchecked = allItems.filter(i => !checkedShoppingItems.has(i.name))
+              const checked = allItems.filter(i => checkedShoppingItems.has(i.name))
               return (
                 <div key={cat} style={{ marginBottom: 14 }}>
                   <div className="section-head">{cat}</div>
                   <div className="card" style={{ overflow: "hidden" }}>
-                    {items.map(item => (
-                      <div key={item.name} className="item-row">
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 500, fontSize: 14 }}>{item.name}</div>
-                          {item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}
+                    {[...unchecked, ...checked].map(item => {
+                      const isChecked = checkedShoppingItems.has(item.name)
+                      return (
+                        <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.45 : 1, background: isChecked ? "#f8f5f0" : "#fff" }}>
+                          {/* チェックボックス */}
+                          <div onClick={() => {
+                            const next = new Set(checkedShoppingItems)
+                            isChecked ? next.delete(item.name) : next.add(item.name)
+                            setCheckedShoppingItems(next)
+                          }} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#3d2b08" : "#d4c5b0"}`, background: isChecked ? "#3d2b08" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
+                            {isChecked ? "✓" : ""}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
+                            {item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}
+                          </div>
+                          {!item.isSeasoning
+                            ? <div className="num-ctrl">
+                                <button className="num-btn" onClick={() => adjustShopping(item.name, -1, item.unit)}>−</button>
+                                <span style={{ minWidth: 60, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
+                                <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit)}>＋</button>
+                              </div>
+                            : <span style={{ fontSize: 13, color: "#8a7050" }}>{item.amount}{item.unit}</span>}
+                          <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => removeShoppingItem(item.name)}>✕</button>
                         </div>
-                        {!item.isSeasoning
-                          ? <div className="num-ctrl">
-                              <button className="num-btn" onClick={() => adjustShopping(item.name, -1, item.unit)}>−</button>
-                              <span style={{ minWidth: 60, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
-                              <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit)}>＋</button>
-                            </div>
-                          : <span style={{ fontSize: 13, color: "#8a7050" }}>{item.amount}{item.unit}</span>}
-                        <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => removeShoppingItem(item.name)}>✕</button>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )
             })}
+            {checkedShoppingItems.size > 0 && (
+              <div style={{ textAlign: "center", padding: "8px", fontSize: 12, color: "#8a7050" }}>
+                {checkedShoppingItems.size}品チェック済み
+              </div>
+            )}
           </div>
         )}
 
@@ -687,6 +713,35 @@ export default function App() {
         const next = history.map(h => h.id === updated.id ? updated : h)
         setHistory(next); triggerSave(buildSave({ history: next })); setEditingHistory(null)
       }} onClose={() => setEditingHistory(null)} />}
+
+      {/* 買い物締めの確認モーダル */}
+      {showConfirmPlan && (
+        <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setShowConfirmPlan(false) }}>
+          <div className="sheet" style={{ maxWidth: 420 }}>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{ fontSize: 44, marginBottom: 12 }}>🗓</div>
+              <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 20, fontWeight: 700, marginBottom: 10 }}>今回の買い物を締めますか？</h3>
+              <p style={{ fontSize: 13, color: "#8a7050", lineHeight: 1.7 }}>
+                現在の献立を履歴に保存して、<br />
+                買い物リスト・献立をリセットします。<br />
+                <span style={{ color: "#c0391b", fontWeight: 600 }}>※この操作は取り消せません</span>
+              </p>
+            </div>
+            <div style={{ background: "#faf3e8", borderRadius: 12, padding: "12px 16px", marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 6, fontWeight: 700 }}>保存される献立</div>
+              {sortedEntries.filter(e => !e.skip && e.recipeId).slice(0, 5).map((e, i) => {
+                const r = recipes.find(r => r.id === e.recipeId)
+                return <div key={i} style={{ fontSize: 13, color: "#3d2b08", marginBottom: 2 }}>・{e.date ? formatDateLabel(e.date) : ""} {r?.name}</div>
+              })}
+              {sortedEntries.filter(e => !e.skip && e.recipeId).length > 5 && <div style={{ fontSize: 12, color: "#8a7050" }}>他{sortedEntries.filter(e => !e.skip && e.recipeId).length - 5}件...</div>}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowConfirmPlan(false)}>キャンセル</button>
+              <button className="btn btn-primary" style={{ flex: 2, padding: "13px", background: "#8a6000" }} onClick={confirmPlan}>締めて履歴に保存する</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
