@@ -121,6 +121,19 @@ export function normalizeName(name) {
   return NAME_ALIASES[name] || name
 }
 
+// 分数・混合数を数値に変換（例: "1/2"→0.5, "1と1/2"→1.5）
+function parseAmount(val) {
+  if (val === null || val === undefined || val === "") return 0
+  if (typeof val === "number") return isNaN(val) ? 0 : val
+  const str = String(val).trim()
+  const fracOnly = str.match(/^(\d+)\/(\d+)$/)
+  if (fracOnly) return parseInt(fracOnly[1]) / parseInt(fracOnly[2])
+  const mixed = str.match(/^(\d+)[\s　と]+(\d+)\/(\d+)$/)
+  if (mixed) return parseInt(mixed[1]) + parseInt(mixed[2]) / parseInt(mixed[3])
+  const num = parseFloat(str)
+  return isNaN(num) ? 0 : num
+}
+
 export function mergeIngredientsAdvanced(selections, recipes) {
   const map = {}
   selections.forEach(sel => {
@@ -128,7 +141,8 @@ export function mergeIngredientsAdvanced(selections, recipes) {
     if (!recipe) return
     recipe.ingredients.filter(i => i.type === "通常食材").forEach(ing => {
       const normalName = normalizeName(ing.name)
-      const { amount, unit } = normalizeUnit(Number(ing.amount) * sel.portion, ing.unit)
+      const parsedAmount = parseAmount(ing.amount)
+      const { amount, unit } = normalizeUnit(parsedAmount * sel.portion, ing.unit)
       const key = `${normalName}__${unit}`
       if (!map[key]) map[key] = { ...ing, name: normalName, amount: 0, unit }
       map[key].amount += amount
