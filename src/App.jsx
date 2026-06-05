@@ -1,6 +1,11 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { hashPassword, getUser, createUser, saveData } from "./supabase.js"
-// 分数・混合数を数値に変換
+import { hashPassword, getUser, createUser, saveData, saveShoppingChecks, getShoppingChecks } from "./supabase.js"
+
+// ── 定数 ──
+const TAGS = ["主菜", "副菜", "お弁当"]
+const STORE_ORDER = ["野菜・果物","肉・魚","卵・乳製品","加工食品・大豆製品","乾物・麺類・パスタ","調味料","冷凍食品・その他"]
+
+// ── 分数・数値変換 ──
 function parseAmount(val) {
   if (val === null || val === undefined || val === "") return 0
   if (typeof val === "number") return isNaN(val) ? 0 : val
@@ -18,7 +23,7 @@ const TO_G  = { "kg": 1000, "g": 1 }
 
 function normalizeUnit(amount, unit) {
   if (TO_ML[unit]) return { amount: amount * TO_ML[unit], unit: "ml" }
-  if (TO_G[unit])  return { amount: amount * TO_G[unit],  unit: "g" }
+  if (TO_G[unit])  return { amount: amount * TO_G[unit], unit: "g" }
   return { amount, unit }
 }
 
@@ -38,59 +43,19 @@ function mergeIngredientsAdvanced(selections, recipes) {
   return Object.values(map).map(i => ({ ...i, amount: Math.round(i.amount * 10) / 10 }))
 }
 
-const TAGS = ["主菜", "副菜", "お弁当"]
-const STORE_ORDER = ["野菜・果物","肉・魚","卵・乳製品","加工食品・大豆製品","乾物・麺類・パスタ","調味料","冷凍食品・その他"]
-
-const SAMPLE_RECIPES = [
-  { id: 1, name: "肉じゃが", tag: "主菜", favorite: true,
-    memo: "じゃがいもはほくほくになるまで煮る。牛肉は最初に炒めてから。",
-    url: "https://www.youtube.com/results?search_query=肉じゃが+レシピ",
-    steps: ["牛肉を一口大に切り、サラダ油で炒める。","じゃがいも・玉ねぎ・にんじんを加えてさらに炒める。","水200mlと砂糖・醤油・みりんを加え、落し蓋をして中火で15分煮る。","じゃがいもに箸が通ったら完成。"],
-    ingredients: [
-      { name: "牛薄切り肉", amount: 150, unit: "g", type: "通常食材", category: "肉・魚" },
-      { name: "じゃがいも", amount: 2, unit: "個", type: "通常食材", category: "野菜・果物" },
-      { name: "玉ねぎ", amount: 1, unit: "個", type: "通常食材", category: "野菜・果物" },
-      { name: "にんじん", amount: 0.5, unit: "本", type: "通常食材", category: "野菜・果物" },
-      { name: "醤油", amount: 3, unit: "大さじ", type: "調味料", category: "調味料" },
-      { name: "みりん", amount: 2, unit: "大さじ", type: "調味料", category: "調味料" },
-      { name: "砂糖", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
-    ]},
-  { id: 2, name: "鶏の唐揚げ", tag: "主菜", favorite: true,
-    memo: "二度揚げでカリッと。下味は30分以上漬けると美味しい。",
-    url: "https://www.youtube.com/results?search_query=唐揚げ+レシピ",
-    steps: ["鶏もも肉を一口大に切り、醤油・酒・すりおろしにんにくで30分漬ける。","片栗粉をまぶして170℃の油で4分揚げ、一度取り出す。","油を190℃に上げて再度1分揚げる。","油を切って完成。"],
-    ingredients: [
-      { name: "鶏もも肉", amount: 300, unit: "g", type: "通常食材", category: "肉・魚" },
-      { name: "醤油", amount: 2, unit: "大さじ", type: "調味料", category: "調味料" },
-      { name: "酒", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
-      { name: "にんにく", amount: 1, unit: "片", type: "通常食材", category: "野菜・果物" },
-      { name: "片栗粉", amount: 4, unit: "大さじ", type: "調味料", category: "乾物・麺類・パスタ" },
-    ]},
-  { id: 3, name: "ほうれん草のおひたし", tag: "副菜", favorite: false, memo: "茹ですぎに注意。", url: "",
-    steps: ["ほうれん草を塩少々入れた熱湯で1〜2分茹でる。","冷水にとって絞り、3〜4cmに切る。","醤油をかけてかつお節をのせる。"],
-    ingredients: [
-      { name: "ほうれん草", amount: 1, unit: "袋", type: "通常食材", category: "野菜・果物" },
-      { name: "醤油", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
-      { name: "かつお節", amount: 1, unit: "パック", type: "通常食材", category: "乾物・麺類・パスタ" },
-    ]},
-  { id: 4, name: "卵焼き", tag: "お弁当", favorite: true, memo: "甘めが好きなら砂糖多め。", url: "",
-    steps: ["卵3個を割りほぐし、砂糖・醤油・みりんを加えてよく混ぜる。","卵焼き器に油を引き、卵液の1/3を流し入れて半熟になったら手前に巻く。","残りの卵液を2回に分けて同様に巻く。","巻き簾で形を整えて冷ます。"],
-    ingredients: [
-      { name: "卵", amount: 3, unit: "個", type: "通常食材", category: "卵・乳製品" },
-      { name: "砂糖", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
-      { name: "醤油", amount: 0.5, unit: "大さじ", type: "調味料", category: "調味料" },
-      { name: "みりん", amount: 0.5, unit: "大さじ", type: "調味料", category: "調味料" },
-    ]},
-  { id: 5, name: "豚汁", tag: "副菜", favorite: false, memo: "味噌は火を止めてから。", url: "",
-    steps: ["豚こま肉・大根・にんじん・こんにゃくを一口大に切る。","鍋にごま油を引いて豚肉を炒め、根菜を加えてさらに炒める。","水600mlを加えて沸騰したらアクを取り、中火で10分煮る。","火を止めてから味噌を溶き入れて完成。"],
-    ingredients: [
-      { name: "豚こま肉", amount: 100, unit: "g", type: "通常食材", category: "肉・魚" },
-      { name: "大根", amount: 100, unit: "g", type: "通常食材", category: "野菜・果物" },
-      { name: "にんじん", amount: 0.5, unit: "本", type: "通常食材", category: "野菜・果物" },
-      { name: "こんにゃく", amount: 0.5, unit: "枚", type: "通常食材", category: "加工食品・大豆製品" },
-      { name: "味噌", amount: 2, unit: "大さじ", type: "調味料", category: "調味料" },
-    ]},
-]
+function mergeSeasonings(selections, recipes) {
+  const map = {}
+  selections.forEach(sel => {
+    const r = recipes.find(r => r.id === sel.recipeId)
+    if (!r) return
+    r.ingredients.filter(i => i.type === "調味料").forEach(ing => {
+      if (!map[ing.name]) map[ing.name] = { ...ing, totalAmount: 0, recipes: [] }
+      map[ing.name].totalAmount += (parseAmount(ing.amount) || 0) * sel.portion
+      if (!map[ing.name].recipes.includes(r.name)) map[ing.name].recipes.push(r.name)
+    })
+  })
+  return Object.values(map)
+}
 
 // ── ユーティリティ ──
 function formatDateLabel(dateStr) {
@@ -108,25 +73,38 @@ function formatPeriodLabel(entries) {
   return `${first.getFullYear()}年${first.getMonth()+1}月${fmt(first)}〜${fmt(last)}`
 }
 
-function mergeSeasonings(selections, recipes) {
-  const map = {}
-  selections.forEach(sel => {
-    const r = recipes.find(r => r.id === sel.recipeId)
-    if (!r) return
-    r.ingredients.filter(i => i.type === "調味料").forEach(ing => {
-      const key = ing.name
-      if (!map[key]) map[key] = { ...ing, totalAmount: 0, recipes: [] }
-      map[key].totalAmount += (Number(ing.amount) || 0) * sel.portion
-      if (!map[key].recipes.includes(r.name)) map[key].recipes.push(r.name)
-    })
-  })
-  return Object.values(map)
-}
-
 const LS_KEY = "kondate_uid"
 function getSavedUid() { try { return localStorage.getItem(LS_KEY) || null } catch { return null } }
 function saveUid(uid) { try { localStorage.setItem(LS_KEY, uid) } catch {} }
 function clearUid() { try { localStorage.removeItem(LS_KEY) } catch {} }
+
+// ── サンプルレシピ ──
+const SAMPLE_RECIPES = [
+  { id: 1, name: "肉じゃが", tag: "主菜", favorite: true, memo: "じゃがいもはほくほくになるまで煮る。", url: "", steps: ["牛肉を炒める。","野菜を加えて炒める。","調味料と水を加えて15分煮る。"],
+    ingredients: [
+      { name: "牛薄切り肉", amount: 150, unit: "g", type: "通常食材", category: "肉・魚" },
+      { name: "じゃがいも", amount: 2, unit: "個", type: "通常食材", category: "野菜・果物" },
+      { name: "玉ねぎ", amount: 1, unit: "個", type: "通常食材", category: "野菜・果物" },
+      { name: "にんじん", amount: 0.5, unit: "本", type: "通常食材", category: "野菜・果物" },
+      { name: "醤油", amount: 3, unit: "大さじ", type: "調味料", category: "調味料" },
+      { name: "みりん", amount: 2, unit: "大さじ", type: "調味料", category: "調味料" },
+      { name: "砂糖", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
+    ]},
+  { id: 2, name: "鶏の唐揚げ", tag: "主菜", favorite: true, memo: "二度揚げでカリッと。", url: "", steps: ["鶏肉を下味に漬ける。","片栗粉をまぶして揚げる。","二度揚げで完成。"],
+    ingredients: [
+      { name: "鶏もも肉", amount: 300, unit: "g", type: "通常食材", category: "肉・魚" },
+      { name: "醤油", amount: 2, unit: "大さじ", type: "調味料", category: "調味料" },
+      { name: "酒", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
+      { name: "にんにく", amount: 1, unit: "片", type: "通常食材", category: "野菜・果物" },
+      { name: "片栗粉", amount: 4, unit: "大さじ", type: "調味料", category: "乾物・麺類・パスタ" },
+    ]},
+  { id: 3, name: "卵焼き", tag: "お弁当", favorite: true, memo: "甘めに仕上げる。", url: "", steps: ["卵を溶いて調味料を混ぜる。","卵焼き器で巻く。"],
+    ingredients: [
+      { name: "卵", amount: 3, unit: "個", type: "通常食材", category: "卵・乳製品" },
+      { name: "砂糖", amount: 1, unit: "大さじ", type: "調味料", category: "調味料" },
+      { name: "醤油", amount: 0.5, unit: "大さじ", type: "調味料", category: "調味料" },
+    ]},
+]
 
 // ── CSS ──
 const CSS = `
@@ -178,6 +156,7 @@ input[type=date]{cursor:pointer;}
 .portion-select{border:1.5px solid #d4c5b0;border-radius:8px;background:#fff;color:#3d2b08;padding:5px 8px;font-size:12px;font-family:inherit;cursor:pointer;}
 .toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#3d2b08;color:#fff;border-radius:20px;padding:8px 20px;font-size:12px;z-index:400;animation:fadeIn .2s;white-space:nowrap;pointer-events:none;}
 .toast.error{background:#c0391b;}
+.toast.warn{background:#8a6000;}
 .error-msg{color:#c0391b;font-size:12px;margin-top:6px;padding:8px 12px;background:#fff0ee;border-radius:8px;}
 .login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f8f5f0;padding:24px;}
 .login-card{background:#fff;border-radius:20px;padding:36px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(61,43,8,0.12);}
@@ -192,16 +171,15 @@ input[type=date]{cursor:pointer;}
 .ing-amount{font-weight:700;color:#3d2b08;}
 .detail-header{background:#3d2b08;color:#f8f0e4;padding:16px 20px 20px;}
 .url-btn{display:flex;align-items:center;gap:8px;background:#fff7ed;border:1.5px solid #e8c87a;border-radius:12px;padding:12px 16px;color:#8a6010;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;width:100%;text-decoration:none;}
-.url-btn:hover{background:#fff0d0;}
 .spinner{width:36px;height:36px;border:3px solid #e8dcc8;border-top-color:#3d2b08;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
-.spinner-sm{width:18px;height:18px;border:2px solid #e8dcc8;border-top-color:#3d2b08;border-radius:50%;animation:spin .8s linear infinite;display:inline-block;}
 .date-entry{background:#fff;border-radius:12px;border:1.5px solid #e8dcc8;margin-bottom:8px;overflow:hidden;}
 .date-entry-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fdfaf6;border-bottom:1px solid #f0e8d8;}
-.skip-badge{background:#f0e8d8;color:#8a7050;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;}
-.ai-badge{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;}
+.bento-section{background:#f0ebfa;border:1.5px solid #c8b8f0;border-radius:12px;margin-bottom:12px;overflow:hidden;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:4px;}
+.sync-dot.off{background:#e0d4c0;}
 `
 
-// ── ログイン画面 ──
+// ── ログイン ──
 function LoginScreen({ onLogin }) {
   const [mode, setMode] = useState("login")
   const [username, setUsername] = useState("")
@@ -211,24 +189,24 @@ function LoginScreen({ onLogin }) {
   const handle = async () => {
     setError("")
     if (!username.trim() || !password.trim()) { setError("ユーザー名とパスワードを入力してください"); return }
-    if (username.trim().length < 2) { setError("ユーザー名は2文字以上で入力してください"); return }
-    if (password.length < 4) { setError("パスワードは4文字以上で入力してください"); return }
+    if (username.trim().length < 2) { setError("ユーザー名は2文字以上"); return }
+    if (password.length < 4) { setError("パスワードは4文字以上"); return }
     setLoading(true)
     try {
       const uid = username.trim().toLowerCase(), hash = await hashPassword(password)
       if (mode === "register") {
         const existing = await getUser(uid)
-        if (existing) { setError("そのユーザー名は既に使われています"); setLoading(false); return }
-        const initData = { recipes: SAMPLE_RECIPES, planEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], history: [] }
+        if (existing) { setError("そのユーザー名は使われています"); setLoading(false); return }
+        const initData = { recipes: SAMPLE_RECIPES, planEntries: [], bentoEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], manualItems: [], history: [] }
         await createUser(uid, hash, initData); saveUid(uid); onLogin(uid, initData)
       } else {
         const user = await getUser(uid)
         if (!user) { setError("ユーザー名が見つかりません"); setLoading(false); return }
         if (user.password_hash !== hash) { setError("パスワードが違います"); setLoading(false); return }
         saveUid(uid)
-        onLogin(uid, user.data || { recipes: SAMPLE_RECIPES, planEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], history: [] })
+        onLogin(uid, user.data || { recipes: SAMPLE_RECIPES, planEntries: [], bentoEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], manualItems: [], history: [] })
       }
-    } catch (e) { setError("エラーが発生しました: " + e.message) }
+    } catch (e) { setError("エラー: " + e.message) }
     setLoading(false)
   }
   return (
@@ -249,7 +227,6 @@ function LoginScreen({ onLogin }) {
           {error && <div className="error-msg">⚠️ {error}</div>}
           <button className="btn btn-primary" style={{ width: "100%", padding: "13px", marginTop: 4 }} onClick={handle} disabled={loading}>{loading ? "処理中..." : mode === "login" ? "ログイン" : "アカウントを作成"}</button>
         </div>
-        {mode === "register" && <div style={{ marginTop: 16, fontSize: 11, color: "#b09070", textAlign: "center", lineHeight: 1.7 }}>登録したアカウントで<br />スマホ・PCどこからでも使えます</div>}
       </div>
     </div>
   )
@@ -265,7 +242,7 @@ function RecipeDetailSheet({ recipe, onClose, onEdit }) {
         <div className="detail-header">
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
             <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#f8f0e4", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>← 戻る</button>
-            <button onClick={onEdit} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#f8f0e4", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>編集</button>
+            {onEdit && <button onClick={onEdit} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#f8f0e4", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>編集</button>}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
             <span className={`tag tag-${recipe.tag}`}>{recipe.tag}</span>
@@ -307,13 +284,13 @@ export default function App() {
   const [autoLogging, setAutoLogging] = useState(true)
   const [screen, setScreen] = useState("catalog")
   const [recipes, setRecipes] = useState([])
-  // planEntries: [{id, date, recipeId, portion, skip}]
-  const [planEntries, setPlanEntries] = useState([])
+  const [planEntries, setPlanEntries] = useState([])      // 通常献立
+  const [bentoEntries, setBentoEntries] = useState([])    // お弁当作り置き
   const [seasoningChecks, setSeasoningChecks] = useState({})
   const [shoppingAdjust, setShoppingAdjust] = useState({})
   const [deletedItems, setDeletedItems] = useState(new Set())
-  const [checkedShoppingItems, setCheckedShoppingItems] = useState(new Set())
-  const [showConfirmPlan, setShowConfirmPlan] = useState(false)
+  const [manualItems, setManualItems] = useState([])       // 手動追加アイテム
+  const [checkedItems, setCheckedItems] = useState([])     // チェック済み（同期）
   const [history, setHistory] = useState([])
   const [filterTag, setFilterTag] = useState("すべて")
   const [filterFav, setFilterFav] = useState(false)
@@ -322,79 +299,120 @@ export default function App() {
   const [detailRecipe, setDetailRecipe] = useState(null)
   const [expandedHistory, setExpandedHistory] = useState(null)
   const [editingHistory, setEditingHistory] = useState(null)
+  const [showConfirmPlan, setShowConfirmPlan] = useState(false)
+  const [addManualInput, setAddManualInput] = useState("")
   const [toast, setToast] = useState(null)
   const saveTimer = useRef(null)
+  const checkSyncTimer = useRef(null)
+  const isSaving = useRef(false)
 
   const showToast = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 2500) }
 
+  // ── 起動時に自動ログイン ──
   useEffect(() => {
     const uid = getSavedUid()
     if (!uid) { setAutoLogging(false); return }
     getUser(uid).then(user => {
       if (user) {
         const d = user.data || {}
-        setUserId(uid); setRecipes(d.recipes || SAMPLE_RECIPES)
+        setUserId(uid)
+        setRecipes(d.recipes || SAMPLE_RECIPES)
         setPlanEntries(d.planEntries || [])
-        setSeasoningChecks(d.seasoningChecks || {}); setShoppingAdjust(d.shoppingAdjust || {})
-        setDeletedItems(new Set(d.deletedItems || [])); setHistory(d.history || [])
+        setBentoEntries(d.bentoEntries || [])
+        setSeasoningChecks(d.seasoningChecks || {})
+        setShoppingAdjust(d.shoppingAdjust || {})
+        setDeletedItems(new Set(d.deletedItems || []))
+        setManualItems(d.manualItems || [])
+        setHistory(d.history || [])
       } else { clearUid() }
       setAutoLogging(false)
     }).catch(() => { clearUid(); setAutoLogging(false) })
   }, [])
 
+  // ── チェック状態の3秒ポーリング ──
+  useEffect(() => {
+    if (!userId) return
+    // 初回ロード
+    getShoppingChecks(userId).then(checks => setCheckedItems(checks || [])).catch(() => {})
+    // 3秒ごとに同期
+    checkSyncTimer.current = setInterval(() => {
+      getShoppingChecks(userId).then(checks => setCheckedItems(checks || [])).catch(() => {})
+    }, 3000)
+    return () => clearInterval(checkSyncTimer.current)
+  }, [userId])
+
   const handleLogin = (uid, data) => {
-    setUserId(uid); setRecipes(data.recipes || SAMPLE_RECIPES)
+    setUserId(uid)
+    setRecipes(data.recipes || SAMPLE_RECIPES)
     setPlanEntries(data.planEntries || [])
-    setSeasoningChecks(data.seasoningChecks || {}); setShoppingAdjust(data.shoppingAdjust || {})
-    setDeletedItems(new Set(data.deletedItems || [])); setHistory(data.history || [])
+    setBentoEntries(data.bentoEntries || [])
+    setSeasoningChecks(data.seasoningChecks || {})
+    setShoppingAdjust(data.shoppingAdjust || {})
+    setDeletedItems(new Set(data.deletedItems || []))
+    setManualItems(data.manualItems || [])
+    setHistory(data.history || [])
     setScreen("catalog")
   }
 
+  // ── 信頼性の高い保存（isSaving フラグ付き） ──
   const triggerSave = useCallback((newData) => {
     if (!userId) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
-      try { await saveData(userId, newData); showToast("保存しました ✓") }
-      catch (e) { showToast("保存失敗: " + e.message, "error") }
-    }, 1500)
+      if (isSaving.current) {
+        // 保存中なら少し待ってリトライ
+        setTimeout(() => triggerSave(newData), 500)
+        return
+      }
+      isSaving.current = true
+      try {
+        await saveData(userId, newData)
+        showToast("保存しました ✓")
+      } catch (e) {
+        showToast("保存失敗、再試行します...", "warn")
+        // 5秒後にリトライ
+        setTimeout(async () => {
+          try { await saveData(userId, newData); showToast("保存しました ✓") }
+          catch { showToast("保存に失敗しました", "error") }
+        }, 5000)
+      } finally { isSaving.current = false }
+    }, 800) // デバウンスを短くして確実に保存
   }, [userId])
 
   const buildSave = useCallback((overrides = {}) => ({
-    recipes, planEntries, seasoningChecks, shoppingAdjust,
-    deletedItems: [...deletedItems], history, ...overrides,
-  }), [recipes, planEntries, seasoningChecks, shoppingAdjust, deletedItems, history])
+    recipes, planEntries, bentoEntries, seasoningChecks,
+    shoppingAdjust, deletedItems: [...deletedItems], manualItems, history, ...overrides,
+  }), [recipes, planEntries, bentoEntries, seasoningChecks, shoppingAdjust, deletedItems, manualItems, history])
 
   // ── レシピ操作 ──
-  const toggleFavorite = id => { const next = recipes.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r); setRecipes(next); triggerSave(buildSave({ recipes: next })) }
+  const toggleFavorite = id => {
+    const next = recipes.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r)
+    setRecipes(next); triggerSave(buildSave({ recipes: next }))
+  }
   const saveRecipe = recipe => {
     const next = recipe.id ? recipes.map(r => r.id === recipe.id ? recipe : r) : [...recipes, { ...recipe, id: Date.now() }]
-    setRecipes(next); triggerSave(buildSave({ recipes: next }))
+    setRecipes(next)
+    triggerSave(buildSave({ recipes: next }))
     setShowRegister(false); setEditRecipe(null)
     if (detailRecipe && recipe.id === detailRecipe.id) setDetailRecipe(recipe)
   }
   const deleteRecipe = id => {
     if (!window.confirm("このレシピを削除しますか？")) return
-    const nextR = recipes.filter(r => r.id !== id), nextP = planEntries.filter(e => e.recipeId !== id)
-    setRecipes(nextR); setPlanEntries(nextP); triggerSave(buildSave({ recipes: nextR, planEntries: nextP }))
+    const nextR = recipes.filter(r => r.id !== id)
+    const nextP = planEntries.filter(e => e.recipeId !== id)
+    const nextB = bentoEntries.filter(e => e.recipeId !== id)
+    setRecipes(nextR); setPlanEntries(nextP); setBentoEntries(nextB)
+    triggerSave(buildSave({ recipes: nextR, planEntries: nextP, bentoEntries: nextB }))
     if (detailRecipe?.id === id) setDetailRecipe(null)
   }
 
-  const deleteHistory = id => {
-    if (!window.confirm("この履歴を削除しますか？")) return
-    const next = history.filter(h => h.id !== id)
-    setHistory(next); triggerSave(buildSave({ history: next }))
-  }
-
-  // ── プラン操作 ──
+  // ── 献立プラン ──
   const sortedEntries = useMemo(() => [...planEntries].sort((a, b) => (a.date || "").localeCompare(b.date || "")), [planEntries])
 
   const addPlanEntry = () => {
     const lastDate = sortedEntries.length > 0 ? sortedEntries[sortedEntries.length - 1].date : null
     let nextDate = ""
-    if (lastDate) {
-      const d = new Date(lastDate); d.setDate(d.getDate() + 1)
-      nextDate = d.toISOString().slice(0, 10)
-    }
+    if (lastDate) { const d = new Date(lastDate); d.setDate(d.getDate() + 1); nextDate = d.toISOString().slice(0, 10) }
     const entry = { id: Date.now(), date: nextDate, recipeId: null, portion: 1, skip: false }
     const next = [...planEntries, entry]
     setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
@@ -415,9 +433,7 @@ export default function App() {
     const idx = sorted.findIndex(e => e.id === id)
     if (dir === -1 && idx === 0) return
     if (dir === 1 && idx === sorted.length - 1) return
-    const swapIdx = idx + dir
-    const a = sorted[idx], b = sorted[swapIdx]
-    // 日付を交換
+    const a = sorted[idx], b = sorted[idx + dir]
     const next = planEntries.map(e => {
       if (e.id === a.id) return { ...e, date: b.date }
       if (e.id === b.id) return { ...e, date: a.date }
@@ -426,11 +442,29 @@ export default function App() {
     setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
   }
 
+  // ── お弁当作り置き ──
+  const addBentoEntry = () => {
+    const entry = { id: Date.now(), recipeId: null, portion: 1, note: "" }
+    const next = [...bentoEntries, entry]
+    setBentoEntries(next); triggerSave(buildSave({ bentoEntries: next }))
+  }
+  const updateBentoEntry = (id, patch) => {
+    const next = bentoEntries.map(e => e.id === id ? { ...e, ...patch } : e)
+    setBentoEntries(next); triggerSave(buildSave({ bentoEntries: next }))
+  }
+  const removeBentoEntry = id => {
+    const next = bentoEntries.filter(e => e.id !== id)
+    setBentoEntries(next); triggerSave(buildSave({ bentoEntries: next }))
+  }
+
   // ── 調味料 ──
-  const allSeasonings = useMemo(() => {
-    const activeSels = planEntries.filter(e => !e.skip && e.recipeId).map(e => ({ recipeId: e.recipeId, portion: e.portion }))
-    return mergeSeasonings(activeSels, recipes)
-  }, [planEntries, recipes])
+  const allActiveSels = useMemo(() => {
+    const planSels = planEntries.filter(e => !e.skip && e.recipeId).map(e => ({ recipeId: e.recipeId, portion: e.portion }))
+    const bentoSels = bentoEntries.filter(e => e.recipeId).map(e => ({ recipeId: e.recipeId, portion: e.portion }))
+    return [...planSels, ...bentoSels]
+  }, [planEntries, bentoEntries])
+
+  const allSeasonings = useMemo(() => mergeSeasonings(allActiveSels, recipes), [allActiveSels, recipes])
 
   const toggleSeasoningCheck = name => {
     const next = { ...seasoningChecks, [name]: !seasoningChecks[name] }
@@ -439,11 +473,13 @@ export default function App() {
 
   // ── 買い物リスト ──
   const baseShoppingList = useMemo(() => {
-    const activeSels = planEntries.filter(e => !e.skip && e.recipeId).map(e => ({ recipeId: e.recipeId, portion: e.portion }))
-    const merged = mergeIngredientsAdvanced(activeSels, recipes)
-    const seasonings = allSeasonings.filter(s => seasoningChecks[s.name]).map(s => ({ ...s, amount: s.totalAmount || "適量", isSeasoning: true }))
-    return [...merged, ...seasonings]
-  }, [planEntries, recipes, seasoningChecks, allSeasonings])
+    const merged = mergeIngredientsAdvanced(allActiveSels, recipes)
+    const seasonings = allSeasonings.filter(s => seasoningChecks[s.name]).map(s => ({
+      ...s, amount: Math.round(s.totalAmount * 10) / 10, isSeasoning: true
+    }))
+    const manual = manualItems.map(m => ({ ...m, isManual: true, category: m.category || "冷凍食品・その他" }))
+    return [...merged, ...seasonings, ...manual]
+  }, [allActiveSels, recipes, seasoningChecks, allSeasonings, manualItems])
 
   const shoppingList = useMemo(() => baseShoppingList
     .filter(i => !deletedItems.has(i.name))
@@ -453,27 +489,72 @@ export default function App() {
 
   const adjustShopping = (name, delta, unit) => {
     const step = ["個","本","袋","枚","パック","片","束"].includes(unit) ? 1 : 10
-    const cur = shoppingAdjust[name] !== undefined ? shoppingAdjust[name] : (Number(baseShoppingList.find(i => i.name === name)?.amount) || 0)
+    const cur = shoppingAdjust[name] !== undefined ? shoppingAdjust[name] : (parseAmount(baseShoppingList.find(i => i.name === name)?.amount) || 0)
     const next = { ...shoppingAdjust, [name]: Math.max(0, Math.round((cur + delta * step) * 10) / 10) }
     setShoppingAdjust(next); triggerSave(buildSave({ shoppingAdjust: next }))
   }
-  const removeShoppingItem = name => { const next = new Set([...deletedItems, name]); setDeletedItems(next); triggerSave(buildSave({ deletedItems: [...next] })) }
+  const removeShoppingItem = name => {
+    const next = new Set([...deletedItems, name])
+    setDeletedItems(next); triggerSave(buildSave({ deletedItems: [...next] }))
+  }
 
-  // ── 確定 ──
+  // ── チェック（リアルタイム同期） ──
+  const toggleCheck = async (name) => {
+    const isChecked = checkedItems.includes(name)
+    const next = isChecked ? checkedItems.filter(n => n !== name) : [...checkedItems, name]
+    setCheckedItems(next)
+    try { await saveShoppingChecks(userId, next) } catch {}
+  }
+
+  // 手動追加アイテム
+  const addManualItem = () => {
+    const trimmed = addManualInput.trim()
+    if (!trimmed) return
+    if (manualItems.find(m => m.name === trimmed)) { showToast("同じ名前のアイテムがあります", "warn"); return }
+    const newItem = { id: Date.now(), name: trimmed, amount: 1, unit: "個", type: "通常食材", category: "冷凍食品・その他" }
+    const next = [...manualItems, newItem]
+    setManualItems(next); triggerSave(buildSave({ manualItems: next }))
+    setAddManualInput("")
+  }
+  const removeManualItem = name => {
+    const next = manualItems.filter(m => m.name !== name)
+    setManualItems(next); triggerSave(buildSave({ manualItems: next }))
+  }
+
+  // ── 今回を締める ──
   const confirmPlan = () => {
-    const menus = sortedEntries.map(e => {
+    const planMenus = sortedEntries.map(e => {
       const r = recipes.find(r => r.id === e.recipeId)
       return { date: e.date, name: e.skip ? "（外食・スキップ）" : r ? r.name : "未設定", portion: e.portion, skip: e.skip }
     })
+    const bentoMenus = bentoEntries.filter(e => e.recipeId).map(e => {
+      const r = recipes.find(r => r.id === e.recipeId)
+      return { name: r ? r.name : "不明", portion: e.portion, isBento: true, note: e.note }
+    })
+    const allMenus = [...planMenus, ...bentoMenus]
     const label = formatPeriodLabel(sortedEntries)
-    const newHistory = [{ id: Date.now(), label, menus, entries: sortedEntries }, ...history]
-    setHistory(newHistory); setPlanEntries([]); setSeasoningChecks({}); setShoppingAdjust({})
-    setDeletedItems(new Set()); setCheckedShoppingItems(new Set()); setShowConfirmPlan(false)
-    triggerSave(buildSave({ history: newHistory, planEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [] }))
+    const newHistory = [{ id: Date.now(), label, menus: allMenus }, ...history]
+    setHistory(newHistory)
+    setPlanEntries([]); setBentoEntries([]); setSeasoningChecks({})
+    setShoppingAdjust({}); setDeletedItems(new Set()); setManualItems([])
+    setCheckedItems([]); setShowConfirmPlan(false)
+    saveShoppingChecks(userId, []).catch(() => {})
+    triggerSave(buildSave({ history: newHistory, planEntries: [], bentoEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], manualItems: [] }))
     setScreen("history")
   }
 
-  const logout = () => { clearUid(); setUserId(null); setRecipes([]); setPlanEntries([]); setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set()); setHistory([]) }
+  const deleteHistory = id => {
+    if (!window.confirm("この履歴を削除しますか？")) return
+    const next = history.filter(h => h.id !== id)
+    setHistory(next); triggerSave(buildSave({ history: next }))
+  }
+
+  const logout = () => {
+    clearUid(); clearInterval(checkSyncTimer.current)
+    setUserId(null); setRecipes([]); setPlanEntries([]); setBentoEntries([])
+    setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set())
+    setManualItems([]); setCheckedItems([]); setHistory([])
+  }
 
   if (autoLogging) return (
     <><style>{CSS}</style>
@@ -497,7 +578,7 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: "#f8f5f0", fontFamily: "'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN',sans-serif", color: "#1a1208", display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", position: "relative" }}>
       <style>{CSS}</style>
-      {toast && <div className={`toast ${toast.type === "error" ? "error" : ""}`}>{toast.msg}</div>}
+      {toast && <div className={`toast ${toast.type === "error" ? "error" : toast.type === "warn" ? "warn" : ""}`}>{toast.msg}</div>}
 
       <header style={{ background: "#3d2b08", color: "#f8f0e4", padding: "13px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, position: "sticky", top: 0, zIndex: 50 }}>
         <span style={{ fontSize: 20 }}>🥢</span>
@@ -533,7 +614,6 @@ export default function App() {
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: r.memo ? 3 : 0 }}>
                           <span style={{ fontWeight: 700, fontSize: 15 }}>{r.name}</span>
                           <span className={`tag tag-${r.tag}`}>{r.tag}</span>
-                          {r.aiGenerated && <span className="ai-badge">AI</span>}
                         </div>
                         {r.memo && <div style={{ fontSize: 11, color: "#a08870", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.memo}</div>}
                       </div>
@@ -554,41 +634,69 @@ export default function App() {
         {/* ── 献立プラン ── */}
         {screen === "plan" && (
           <div style={{ padding: "16px 16px 0" }}>
-            <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 13, color: "#8a7050" }}>日付を選んでメニューを設定してね</div>
-              <button className="btn btn-outline btn-sm" onClick={addPlanEntry}>＋ 日を追加</button>
+
+            {/* お弁当作り置きセクション */}
+            <div className="bento-section">
+              <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: bentoEntries.length > 0 ? "1px solid #d8c8f0" : "none" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>🍱</span>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: "#4a2fa0" }}>お弁当作り置き</span>
+                </div>
+                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, borderColor: "#c8b8f0", color: "#4a2fa0" }} onClick={addBentoEntry}>＋ 追加</button>
+              </div>
+              {bentoEntries.length === 0 && <div style={{ padding: "10px 14px", fontSize: 12, color: "#a090c0" }}>今回作り置きするお弁当メニューを追加してね</div>}
+              {bentoEntries.map(entry => (
+                <div key={entry.id} style={{ padding: "10px 14px", borderBottom: "1px solid #e8ddf8" }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                    <select value={entry.recipeId || ""} onChange={e => updateBentoEntry(entry.id, { recipeId: e.target.value ? Number(e.target.value) : null })} style={{ flex: 1, fontSize: 13, padding: "6px 10px" }}>
+                      <option value="">── お弁当メニューを選択 ──</option>
+                      {recipes.filter(r => r.tag === "お弁当").map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      <optgroup label="── その他のレシピ ──">
+                        {recipes.filter(r => r.tag !== "お弁当").map(r => <option key={r.id} value={r.id}>{r.name}（{r.tag}）</option>)}
+                      </optgroup>
+                    </select>
+                    <button className="btn-icon" style={{ color: "#c0391b" }} onClick={() => removeBentoEntry(entry.id)}>✕</button>
+                  </div>
+                  {entry.recipeId && (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <select className="portion-select" value={entry.portion} onChange={e => updateBentoEntry(entry.id, { portion: Number(e.target.value) })}>
+                        <option value={1}>1回分（2人前）</option>
+                        <option value={2}>2回分（4人前）</option>
+                        <option value={3}>3回分（6人前）</option>
+                      </select>
+                      <input placeholder="メモ（例：月〜水用）" value={entry.note || ""} onChange={e => updateBentoEntry(entry.id, { note: e.target.value })} style={{ flex: 1, fontSize: 12, padding: "6px 10px" }} />
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
-            {sortedEntries.length === 0 && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>📅</div><div>「＋ 日を追加」から始めよう</div></div>}
-
+            {/* 通常献立 */}
+            <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#3d2b08" }}>🍽️ 夕食・その他の献立</div>
+              <button className="btn btn-outline btn-sm" onClick={addPlanEntry}>＋ 日を追加</button>
+            </div>
+            {sortedEntries.length === 0 && <div style={{ textAlign: "center", padding: "20px", color: "#b09070", fontSize: 13 }}>「＋ 日を追加」から始めよう</div>}
             {sortedEntries.map((entry, idx) => (
               <div key={entry.id} className="date-entry">
                 <div className="date-entry-header">
-                  {/* 上下移動 */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(entry.id, -1)} disabled={idx === 0}>▲</button>
                     <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(entry.id, 1)} disabled={idx === sortedEntries.length - 1}>▼</button>
                   </div>
-                  {/* 日付 */}
-                  <input type="date" value={entry.date || ""} onChange={e => updateEntry(entry.id, { date: e.target.value })}
-                    style={{ width: 150, fontSize: 13, padding: "6px 10px", flex: "0 0 auto" }} />
-                  <div style={{ fontSize: 13, color: "#8a7050", minWidth: 80 }}>{entry.date ? formatDateLabel(entry.date) : "日付未設定"}</div>
-                  {/* スキップトグル */}
+                  <input type="date" value={entry.date || ""} onChange={e => updateEntry(entry.id, { date: e.target.value })} style={{ width: 148, fontSize: 13, padding: "6px 8px", flex: "0 0 auto" }} />
+                  <div style={{ fontSize: 12, color: "#8a7050", minWidth: 76 }}>{entry.date ? formatDateLabel(entry.date) : "日付未設定"}</div>
                   <button onClick={() => updateEntry(entry.id, { skip: !entry.skip })} style={{ marginLeft: "auto", background: entry.skip ? "#f0e8d8" : "none", border: "1.5px solid #d4c5b0", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: entry.skip ? "#8a7050" : "#c0a880", fontWeight: 600 }}>
                     {entry.skip ? "スキップ中" : "スキップ"}
                   </button>
                   <button className="btn-icon" style={{ color: "#c0391b" }} onClick={() => removeEntry(entry.id)}>✕</button>
                 </div>
-
                 {!entry.skip && (
                   <div style={{ padding: "10px 14px" }}>
-                    <div style={{ marginBottom: 8 }}>
-                      <select value={entry.recipeId || ""} onChange={e => updateEntry(entry.id, { recipeId: e.target.value ? Number(e.target.value) : null })}
-                        style={{ fontSize: 13, padding: "8px 10px" }}>
-                        <option value="">── レシピを選択 ──</option>
-                        {recipes.map(r => <option key={r.id} value={r.id}>{r.name}（{r.tag}）</option>)}
-                      </select>
-                    </div>
+                    <select value={entry.recipeId || ""} onChange={e => updateEntry(entry.id, { recipeId: e.target.value ? Number(e.target.value) : null })} style={{ fontSize: 13, padding: "8px 10px", marginBottom: entry.recipeId ? 8 : 0 }}>
+                      <option value="">── レシピを選択 ──</option>
+                      {recipes.map(r => <option key={r.id} value={r.id}>{r.name}（{r.tag}）</option>)}
+                    </select>
                     {entry.recipeId && (
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <select className="portion-select" value={entry.portion} onChange={e => updateEntry(entry.id, { portion: Number(e.target.value) })}>
@@ -605,19 +713,19 @@ export default function App() {
               </div>
             ))}
 
-            {planEntries.some(e => !e.skip && e.recipeId) && (
+            {(planEntries.some(e => !e.skip && e.recipeId) || bentoEntries.some(e => e.recipeId)) && (
               <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setScreen("seasoning")}>調味料チェックへ →</button>
-                <button className="btn btn-outline" style={{ flex: 1, borderColor: "#e8a000", color: "#8a6000" }} onClick={() => setShowConfirmPlan(true)}>🗓 今回の買い物を締める</button>
+                <button className="btn btn-outline" style={{ flex: 1, borderColor: "#e8a000", color: "#8a6000" }} onClick={() => setShowConfirmPlan(true)}>🗓 買い物を締める</button>
               </div>
             )}
           </div>
         )}
 
-        {/* ── 調味料チェック（分量表示付き） ── */}
+        {/* ── 調味料チェック ── */}
         {screen === "seasoning" && (
           <div style={{ padding: "16px 16px 0" }}>
-            <div style={{ marginBottom: 14, fontSize: 13, color: "#8a7050" }}>今回のメニューで使う調味料です。<br />家にない・買い足したいものにチェックを入れてね ✓</div>
+            <div style={{ marginBottom: 14, fontSize: 13, color: "#8a7050" }}>今回使う調味料です。<br />家にない・買い足したいものにチェックを ✓</div>
             <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
               {!allSeasonings.length && <div style={{ padding: "20px", color: "#c0a880", fontSize: 13, textAlign: "center" }}>献立タブでメニューを設定してください</div>}
               {allSeasonings.map(s => (
@@ -625,10 +733,7 @@ export default function App() {
                   <div className={`custom-check ${seasoningChecks[s.name] ? "checked" : ""}`}>{seasoningChecks[s.name] ? "✓" : ""}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>
-                      合計 <strong>{Math.round(s.totalAmount * 10) / 10}{s.unit}</strong>
-                      　使用レシピ: {s.recipes.join("・")}
-                    </div>
+                    <div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>合計 <strong>{Math.round(s.totalAmount * 10) / 10}{s.unit}</strong>　{s.recipes.join("・")}</div>
                   </div>
                   {seasoningChecks[s.name] && <span style={{ fontSize: 11, color: "#c0391b", fontWeight: 700, flexShrink: 0 }}>リストへ追加</span>}
                 </div>
@@ -641,39 +746,44 @@ export default function App() {
         {/* ── 買い物リスト ── */}
         {screen === "shopping" && (
           <div style={{ padding: "16px 16px 0" }}>
+            {/* 同期インジケーター */}
             <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 13, color: "#8a7050" }}>タップでチェック、＋−で数量調整</div>
-              {planEntries.some(e => !e.skip && e.recipeId) && (
-                <button className="btn btn-outline btn-sm" style={{ fontSize: 12, borderColor: "#e8a000", color: "#8a6000" }} onClick={() => setShowConfirmPlan(true)}>
-                  🗓 買い物を締める
-                </button>
+              <div style={{ fontSize: 11, color: "#8a7050", display: "flex", alignItems: "center" }}>
+                <span className="sync-dot" />リアルタイム同期中
+              </div>
+              {(planEntries.some(e => !e.skip && e.recipeId) || bentoEntries.some(e => e.recipeId)) && (
+                <button className="btn btn-outline btn-sm" style={{ fontSize: 12, borderColor: "#e8a000", color: "#8a6000" }} onClick={() => setShowConfirmPlan(true)}>🗓 買い物を締める</button>
               )}
             </div>
-            {!shoppingList.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div><div>献立タブでメニューを設定してください</div></div>}
+
+            {/* 手動追加 */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              <input placeholder="＋ アイテムを手入力（例：洗剤）" value={addManualInput} onChange={e => setAddManualInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addManualItem()} style={{ flex: 1, fontSize: 13, padding: "9px 12px" }} />
+              <button className="btn btn-primary btn-sm" onClick={addManualItem} style={{ whiteSpace: "nowrap" }}>追加</button>
+            </div>
+
+            {!shoppingList.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div><div>献立タブでメニューを設定するか<br />上の欄から手動で追加してください</div></div>}
+
             {STORE_ORDER.map(cat => {
               const allItems = shoppingList.filter(i => i.category === cat)
               if (!allItems.length) return null
-              const unchecked = allItems.filter(i => !checkedShoppingItems.has(i.name))
-              const checked = allItems.filter(i => checkedShoppingItems.has(i.name))
+              const unchecked = allItems.filter(i => !checkedItems.includes(i.name))
+              const checked = allItems.filter(i => checkedItems.includes(i.name))
               return (
                 <div key={cat} style={{ marginBottom: 14 }}>
                   <div className="section-head">{cat}</div>
                   <div className="card" style={{ overflow: "hidden" }}>
                     {[...unchecked, ...checked].map(item => {
-                      const isChecked = checkedShoppingItems.has(item.name)
+                      const isChecked = checkedItems.includes(item.name)
                       return (
-                        <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.45 : 1, background: isChecked ? "#f8f5f0" : "#fff" }}>
-                          {/* チェックボックス */}
-                          <div onClick={() => {
-                            const next = new Set(checkedShoppingItems)
-                            isChecked ? next.delete(item.name) : next.add(item.name)
-                            setCheckedShoppingItems(next)
-                          }} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#3d2b08" : "#d4c5b0"}`, background: isChecked ? "#3d2b08" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
+                        <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f8f5f0" : "#fff" }}>
+                          <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#3d2b08" : "#d4c5b0"}`, background: isChecked ? "#3d2b08" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
                             {isChecked ? "✓" : ""}
                           </div>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
                             {item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}
+                            {item.isManual && <span style={{ fontSize: 10, color: "#7a9fc0" }}>手動追加</span>}
                           </div>
                           {!item.isSeasoning
                             ? <div className="num-ctrl">
@@ -682,7 +792,7 @@ export default function App() {
                                 <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit)}>＋</button>
                               </div>
                             : <span style={{ fontSize: 13, color: "#8a7050" }}>{item.amount}{item.unit}</span>}
-                          <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => removeShoppingItem(item.name)}>✕</button>
+                          <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => item.isManual ? removeManualItem(item.name) : removeShoppingItem(item.name)}>✕</button>
                         </div>
                       )
                     })}
@@ -690,11 +800,7 @@ export default function App() {
                 </div>
               )
             })}
-            {checkedShoppingItems.size > 0 && (
-              <div style={{ textAlign: "center", padding: "8px", fontSize: 12, color: "#8a7050" }}>
-                {checkedShoppingItems.size}品チェック済み
-              </div>
-            )}
+            {checkedItems.length > 0 && <div style={{ textAlign: "center", padding: "8px", fontSize: 12, color: "#8a7050" }}>{checkedItems.length}品チェック済み</div>}
           </div>
         )}
 
@@ -711,8 +817,8 @@ export default function App() {
                     <div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>{week.menus.length}日分</div>
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={e => { e.stopPropagation(); setEditingHistory(week) }}>✏️ 編集</button>
-                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: "#c0391b" }} onClick={e => { e.stopPropagation(); deleteHistory(week.id) }}>🗑 削除</button>
+                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={e => { e.stopPropagation(); setEditingHistory(week) }}>✏️</button>
+                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: "#c0391b" }} onClick={e => { e.stopPropagation(); deleteHistory(week.id) }}>🗑</button>
                     <span style={{ color: "#8a7050" }}>{expandedHistory === week.id ? "▲" : "▼"}</span>
                   </div>
                 </div>
@@ -720,8 +826,15 @@ export default function App() {
                   <div style={{ borderTop: "1px solid #f0e8d8" }}>
                     {week.menus.map((m, i) => (
                       <div key={i} className="item-row">
-                        <span style={{ fontSize: 12, color: "#8a7050", minWidth: 80 }}>{m.date ? formatDateLabel(m.date) : `${i+1}日目`}</span>
+                        {m.isBento
+                          ? <span style={{ fontSize: 11, color: "#4a2fa0", minWidth: 80 }}>🍱 お弁当</span>
+                          : <span style={{ fontSize: 12, color: "#8a7050", minWidth: 80 }}>{m.date ? formatDateLabel(m.date) : `${i+1}日目`}</span>}
                         <span style={{ flex: 1, fontSize: 14, color: m.skip ? "#c0a880" : "#1a1208" }}>{m.name}</span>
+                        {/* レシピ詳細を見るボタン */}
+                        {!m.skip && (() => {
+                          const r = recipes.find(r => r.name === m.name)
+                          return r ? <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: "#7a9fc0" }} onClick={() => setDetailRecipe(r)}>詳細</button> : null
+                        })()}
                         {!m.skip && <span style={{ fontSize: 11, color: "#a08870" }}>{m.portion === 1 ? "1日分" : `${m.portion}日分`}</span>}
                       </div>
                     ))}
@@ -743,33 +856,31 @@ export default function App() {
         ))}
       </nav>
 
-      {detailRecipe && <RecipeDetailSheet recipe={detailRecipe} onClose={() => setDetailRecipe(null)} onEdit={() => { setEditRecipe(detailRecipe); setShowRegister(true); setDetailRecipe(null) }} />}
+      {detailRecipe && <RecipeDetailSheet recipe={detailRecipe} onClose={() => setDetailRecipe(null)} onEdit={detailRecipe ? () => { setEditRecipe(detailRecipe); setShowRegister(true); setDetailRecipe(null) } : null} />}
       {showRegister && <RegisterSheet recipe={editRecipe} onSave={saveRecipe} onClose={() => { setShowRegister(false); setEditRecipe(null) }} />}
       {editingHistory && <HistoryEditSheet historyItem={editingHistory} recipes={recipes} onSave={updated => {
         const next = history.map(h => h.id === updated.id ? updated : h)
         setHistory(next); triggerSave(buildSave({ history: next })); setEditingHistory(null)
       }} onClose={() => setEditingHistory(null)} />}
 
-      {/* 買い物締めの確認モーダル */}
       {showConfirmPlan && (
         <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setShowConfirmPlan(false) }}>
           <div className="sheet" style={{ maxWidth: 420 }}>
             <div style={{ textAlign: "center", marginBottom: 20 }}>
               <div style={{ fontSize: 44, marginBottom: 12 }}>🗓</div>
               <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 20, fontWeight: 700, marginBottom: 10 }}>今回の買い物を締めますか？</h3>
-              <p style={{ fontSize: 13, color: "#8a7050", lineHeight: 1.7 }}>
-                現在の献立を履歴に保存して、<br />
-                買い物リスト・献立をリセットします。<br />
-                <span style={{ color: "#c0391b", fontWeight: 600 }}>※この操作は取り消せません</span>
-              </p>
+              <p style={{ fontSize: 13, color: "#8a7050", lineHeight: 1.7 }}>献立を履歴に保存して、買い物リストをリセットします。<br /><span style={{ color: "#c0391b", fontWeight: 600 }}>※この操作は取り消せません</span></p>
             </div>
             <div style={{ background: "#faf3e8", borderRadius: 12, padding: "12px 16px", marginBottom: 20 }}>
               <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 6, fontWeight: 700 }}>保存される献立</div>
-              {sortedEntries.filter(e => !e.skip && e.recipeId).slice(0, 5).map((e, i) => {
+              {sortedEntries.filter(e => !e.skip && e.recipeId).slice(0, 4).map((e, i) => {
                 const r = recipes.find(r => r.id === e.recipeId)
                 return <div key={i} style={{ fontSize: 13, color: "#3d2b08", marginBottom: 2 }}>・{e.date ? formatDateLabel(e.date) : ""} {r?.name}</div>
               })}
-              {sortedEntries.filter(e => !e.skip && e.recipeId).length > 5 && <div style={{ fontSize: 12, color: "#8a7050" }}>他{sortedEntries.filter(e => !e.skip && e.recipeId).length - 5}件...</div>}
+              {bentoEntries.filter(e => e.recipeId).slice(0, 2).map((e, i) => {
+                const r = recipes.find(r => r.id === e.recipeId)
+                return <div key={i} style={{ fontSize: 13, color: "#4a2fa0", marginBottom: 2 }}>🍱 {r?.name}（お弁当）</div>
+              })}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowConfirmPlan(false)}>キャンセル</button>
@@ -796,7 +907,7 @@ function HistoryEditSheet({ historyItem, recipes, onSave, onClose }) {
         <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 14 }}>{historyItem.label}</div>
         {menus.map((m, i) => (
           <div key={i} style={{ background: "#faf5ee", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 6 }}>{m.date ? formatDateLabel(m.date) : `${i+1}日目`}</div>
+            <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 6 }}>{m.isBento ? "🍱 お弁当" : m.date ? formatDateLabel(m.date) : `${i+1}日目`}</div>
             {!m.skip
               ? <select value={recipes.find(r => r.name === m.name)?.id || ""} onChange={e => {
                   const r = recipes.find(r => r.id === Number(e.target.value))
@@ -822,7 +933,6 @@ function RegisterSheet({ recipe, onSave, onClose }) {
   const blank = { name: "", tag: "主菜", favorite: false, memo: "", url: "", steps: [""], servings: 2, ingredients: [{ name: "", amount: "", unit: "g", type: "通常食材", category: "野菜・果物" }] }
   const [form, setForm] = useState(() => { if (!recipe) return blank; const r = JSON.parse(JSON.stringify(recipe)); if (!r.steps) r.steps = [""]; if (!r.servings) r.servings = 2; return r })
   const [regTab, setRegTab] = useState("basic")
-
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const setStep = (i, v) => setForm(f => ({ ...f, steps: f.steps.map((s, j) => j === i ? v : s) }))
   const addStep = () => setForm(f => ({ ...f, steps: [...f.steps, ""] }))
@@ -831,7 +941,6 @@ function RegisterSheet({ recipe, onSave, onClose }) {
   const addIng = () => setForm(f => ({ ...f, ingredients: [...f.ingredients, { name: "", amount: "", unit: "g", type: "通常食材", category: "野菜・果物" }] }))
   const removeIng = i => setForm(f => ({ ...f, ingredients: f.ingredients.filter((_, j) => j !== i) }))
   const tabStyle = id => ({ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: regTab === id ? "#3d2b08" : "#b09070", borderBottom: regTab === id ? "2px solid #3d2b08" : "2px solid transparent", transition: "all .15s" })
-
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="sheet">
@@ -839,13 +948,11 @@ function RegisterSheet({ recipe, onSave, onClose }) {
           <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 18, fontWeight: 700 }}>{recipe ? "レシピを編集" : "レシピを追加"}</h3>
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
         </div>
-
         <div style={{ display: "flex", borderBottom: "1px solid #f0e8d8", marginBottom: 18 }}>
           <button style={tabStyle("basic")} onClick={() => setRegTab("basic")}>基本情報</button>
           <button style={tabStyle("steps")} onClick={() => setRegTab("steps")}>作り方</button>
           <button style={tabStyle("ingredients")} onClick={() => setRegTab("ingredients")}>材料</button>
         </div>
-
         {regTab === "basic" && (
           <div style={{ display: "grid", gap: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "flex-end" }}>
@@ -880,7 +987,7 @@ function RegisterSheet({ recipe, onSave, onClose }) {
                 <select value={form.servings || 2} onChange={e => set("servings", Number(e.target.value))} style={{ fontSize: 13, padding: "4px 8px", width: "auto" }}>
                   {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}人前</option>)}
                 </select>
-                <div style={{ fontSize: 12, color: "#8a7050" }}>で入力してね</div>
+                <div style={{ fontSize: 12, color: "#8a7050" }}>で入力</div>
               </div>
               <button className="btn btn-outline btn-sm" onClick={addIng}>＋ 追加</button>
             </div>
