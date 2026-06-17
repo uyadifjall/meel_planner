@@ -1,6 +1,6 @@
 {
-  "name": "週献立ノート",
-  "short_name": "献立ノート",
+  "name": "CookFlow",
+  "short_name": "CookFlow",
   "description": "週ごとの献立管理・買い物リスト自動生成アプリ",
   "start_url": "/",
   "display": "standalone",
