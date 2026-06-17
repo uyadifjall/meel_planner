@@ -245,14 +245,14 @@ function LoginScreen({ onLogin }) {
       if (mode === "register") {
         const existing = await getUser(uid)
         if (existing) { setError("そのユーザー名は使われています"); setLoading(false); return }
-        const initData = { recipes: SAMPLE_RECIPES, planEntries: [], bentoEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], manualItems: [], history: [] }
+        const initData = { recipes: SAMPLE_RECIPES, planEntries: [], bentoEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], manualItems: [], drugItems: [], history: [] }
         await createUser(uid, hash, initData); saveUid(uid); onLogin(uid, initData)
       } else {
         const user = await getUser(uid)
         if (!user) { setError("ユーザー名が見つかりません"); setLoading(false); return }
         if (user.password_hash !== hash) { setError("パスワードが違います"); setLoading(false); return }
         saveUid(uid)
-        onLogin(uid, user.data || { recipes: SAMPLE_RECIPES, planEntries: [], bentoEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], manualItems: [], history: [] })
+        onLogin(uid, user.data || { recipes: SAMPLE_RECIPES, planEntries: [], bentoEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], manualItems: [], drugItems: [], history: [] })
       }
     } catch (e) { setError("エラー: " + e.message) }
     setLoading(false)
@@ -337,7 +337,9 @@ export default function App() {
   const [seasoningChecks, setSeasoningChecks] = useState({})
   const [shoppingAdjust, setShoppingAdjust] = useState({})
   const [deletedItems, setDeletedItems] = useState(new Set())
-  const [manualItems, setManualItems] = useState([])       // 手動追加アイテム
+  const [manualItems, setManualItems] = useState([])       // 手動追加アイテム（スーパー用）
+  const [drugItems, setDrugItems] = useState([])           // ドラッグストア用リスト
+  const [shoppingTab, setShoppingTab] = useState("super")  // super | drug
   const [checkedItems, setCheckedItems] = useState([])     // チェック済み（同期）
   const [history, setHistory] = useState([])
   const [filterTag, setFilterTag] = useState("すべて")
@@ -371,6 +373,7 @@ export default function App() {
         setShoppingAdjust(d.shoppingAdjust || {})
         setDeletedItems(new Set(d.deletedItems || []))
         setManualItems(d.manualItems || [])
+        setDrugItems(d.drugItems || [])
         setHistory(d.history || [])
       } else { clearUid() }
       setAutoLogging(false)
@@ -398,6 +401,7 @@ export default function App() {
     setShoppingAdjust(data.shoppingAdjust || {})
     setDeletedItems(new Set(data.deletedItems || []))
     setManualItems(data.manualItems || [])
+    setDrugItems(data.drugItems || [])
     setHistory(data.history || [])
     setScreen("catalog")
   }
@@ -429,8 +433,8 @@ export default function App() {
 
   const buildSave = useCallback((overrides = {}) => ({
     recipes, planEntries, bentoEntries, seasoningChecks,
-    shoppingAdjust, deletedItems: [...deletedItems], manualItems, history, ...overrides,
-  }), [recipes, planEntries, bentoEntries, seasoningChecks, shoppingAdjust, deletedItems, manualItems, history])
+    shoppingAdjust, deletedItems: [...deletedItems], manualItems, drugItems, history, ...overrides,
+  }), [recipes, planEntries, bentoEntries, seasoningChecks, shoppingAdjust, deletedItems, manualItems, drugItems, history])
 
   // ── レシピ操作 ──
   const toggleFavorite = id => {
@@ -569,6 +573,21 @@ export default function App() {
     setManualItems(next); triggerSave(buildSave({ manualItems: next }))
   }
 
+  // ドラッグストア用リスト操作
+  const addDrugItem = () => {
+    const trimmed = addManualInput.trim()
+    if (!trimmed) return
+    if (drugItems.find(m => m.name === trimmed)) { showToast("同じ名前のアイテムがあります", "warn"); return }
+    const newItem = { id: Date.now(), name: trimmed }
+    const next = [...drugItems, newItem]
+    setDrugItems(next); triggerSave(buildSave({ drugItems: next }))
+    setAddManualInput("")
+  }
+  const removeDrugItem = name => {
+    const next = drugItems.filter(m => m.name !== name)
+    setDrugItems(next); triggerSave(buildSave({ drugItems: next }))
+  }
+
   // ── 今回を締める ──
   const confirmPlan = () => {
     const planMenus = sortedEntries.map(e => {
@@ -601,7 +620,7 @@ export default function App() {
     clearUid(); clearInterval(checkSyncTimer.current)
     setUserId(null); setRecipes([]); setPlanEntries([]); setBentoEntries([])
     setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set())
-    setManualItems([]); setCheckedItems([]); setHistory([])
+    setManualItems([]); setDrugItems([]); setCheckedItems([]); setHistory([])
   }
 
   if (autoLogging) return (
@@ -794,61 +813,102 @@ export default function App() {
         {/* ── 買い物リスト ── */}
         {screen === "shopping" && (
           <div style={{ padding: "16px 16px 0" }}>
-            {/* 同期インジケーター */}
-            <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 11, color: "#8a7050", display: "flex", alignItems: "center" }}>
-                <span className="sync-dot" />リアルタイム同期中
-              </div>
-              {(planEntries.some(e => !e.skip && e.recipeId) || bentoEntries.some(e => e.recipeId)) && (
-                <button className="btn btn-outline btn-sm" style={{ fontSize: 12, borderColor: "#e8a000", color: "#8a6000" }} onClick={() => setShowConfirmPlan(true)}>🗓 買い物を締める</button>
-              )}
+            {/* タブ切り替え：スーパー / ドラッグストア */}
+            <div className="tab-toggle" style={{ marginBottom: 14 }}>
+              <button className={shoppingTab === "super" ? "active" : ""} onClick={() => setShoppingTab("super")}>🛒 スーパー</button>
+              <button className={shoppingTab === "drug" ? "active" : ""} onClick={() => setShoppingTab("drug")}>💊 ドラッグストア</button>
             </div>
 
-            {/* 手動追加 */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              <input placeholder="＋ アイテムを手入力（例：洗剤）" value={addManualInput} onChange={e => setAddManualInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addManualItem()} style={{ flex: 1, fontSize: 13, padding: "9px 12px" }} />
-              <button className="btn btn-primary btn-sm" onClick={addManualItem} style={{ whiteSpace: "nowrap" }}>追加</button>
-            </div>
+            {shoppingTab === "super" ? (
+              <>
+                {/* 同期インジケーター */}
+                <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 11, color: "#8a7050", display: "flex", alignItems: "center" }}>
+                    <span className="sync-dot" />リアルタイム同期中
+                  </div>
+                  {(planEntries.some(e => !e.skip && e.recipeId) || bentoEntries.some(e => e.recipeId)) && (
+                    <button className="btn btn-outline btn-sm" style={{ fontSize: 12, borderColor: "#e8a000", color: "#8a6000" }} onClick={() => setShowConfirmPlan(true)}>🗓 買い物を締める</button>
+                  )}
+                </div>
 
-            {!shoppingList.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div><div>献立タブでメニューを設定するか<br />上の欄から手動で追加してください</div></div>}
+                {/* 手動追加 */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                  <input placeholder="＋ アイテムを手入力（例：洗剤）" value={addManualInput} onChange={e => setAddManualInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addManualItem()} style={{ flex: 1, fontSize: 13, padding: "9px 12px" }} />
+                  <button className="btn btn-primary btn-sm" onClick={addManualItem} style={{ whiteSpace: "nowrap" }}>追加</button>
+                </div>
 
-            {STORE_ORDER.map(cat => {
-              const allItems = shoppingList.filter(i => i.category === cat)
-              if (!allItems.length) return null
-              const unchecked = allItems.filter(i => !checkedItems.includes(i.name))
-              const checked = allItems.filter(i => checkedItems.includes(i.name))
-              return (
-                <div key={cat} style={{ marginBottom: 14 }}>
-                  <div className="section-head">{cat}</div>
+                {!shoppingList.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div><div>献立タブでメニューを設定するか<br />上の欄から手動で追加してください</div></div>}
+
+                {STORE_ORDER.map(cat => {
+                  const allItems = shoppingList.filter(i => i.category === cat)
+                  if (!allItems.length) return null
+                  const unchecked = allItems.filter(i => !checkedItems.includes(i.name))
+                  const checked = allItems.filter(i => checkedItems.includes(i.name))
+                  return (
+                    <div key={cat} style={{ marginBottom: 14 }}>
+                      <div className="section-head">{cat}</div>
+                      <div className="card" style={{ overflow: "hidden" }}>
+                        {[...unchecked, ...checked].map(item => {
+                          const isChecked = checkedItems.includes(item.name)
+                          return (
+                            <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f8f5f0" : "#fff" }}>
+                              <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#3d2b08" : "#d4c5b0"}`, background: isChecked ? "#3d2b08" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
+                                {isChecked ? "✓" : ""}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
+                                {item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}
+                                {item.isManual && <span style={{ fontSize: 10, color: "#7a9fc0" }}>手動追加</span>}
+                              </div>
+                              {!item.isSeasoning
+                                ? <div className="num-ctrl">
+                                    <button className="num-btn" onClick={() => adjustShopping(item.name, -1, item.unit)}>−</button>
+                                    <span style={{ minWidth: 60, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
+                                    <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit)}>＋</button>
+                                  </div>
+                                : <span style={{ fontSize: 13, color: "#8a7050" }}>{item.amount}{item.unit}</span>}
+                              <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => item.isManual ? removeManualItem(item.name) : removeShoppingItem(item.name)}>✕</button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+                {checkedItems.length > 0 && <div style={{ textAlign: "center", padding: "8px", fontSize: 12, color: "#8a7050" }}>{checkedItems.length}品チェック済み</div>}
+              </>
+            ) : (
+              <>
+                {/* ドラッグストア用リスト */}
+                <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 11, color: "#8a7050", display: "flex", alignItems: "center" }}><span className="sync-dot" />リアルタイム同期中</span>
+                </div>
+                <div style={{ background: "#fff0e0", border: "1.5px solid #f0c890", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#8a5a10" }}>
+                  💊 ウェル活・ドラッグストアの買い物はここで管理。スーパーのリストとは別に独立しています。
+                </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                  <input placeholder="＋ アイテムを追加（例：シャンプー）" value={addManualInput} onChange={e => setAddManualInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addDrugItem()} style={{ flex: 1, fontSize: 13, padding: "9px 12px" }} />
+                  <button className="btn btn-primary btn-sm" onClick={addDrugItem} style={{ whiteSpace: "nowrap", background: "#c05a1b" }}>追加</button>
+                </div>
+                {!drugItems.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>💊</div><div>ウェル活で買いたいものを<br />上の欄から追加してください</div></div>}
+                {drugItems.length > 0 && (
                   <div className="card" style={{ overflow: "hidden" }}>
-                    {[...unchecked, ...checked].map(item => {
+                    {[...drugItems.filter(i => !checkedItems.includes(i.name)), ...drugItems.filter(i => checkedItems.includes(i.name))].map(item => {
                       const isChecked = checkedItems.includes(item.name)
                       return (
                         <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f8f5f0" : "#fff" }}>
-                          <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#3d2b08" : "#d4c5b0"}`, background: isChecked ? "#3d2b08" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
+                          <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#c05a1b" : "#d4c5b0"}`, background: isChecked ? "#c05a1b" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
                             {isChecked ? "✓" : ""}
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
-                            {item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}
-                            {item.isManual && <span style={{ fontSize: 10, color: "#7a9fc0" }}>手動追加</span>}
-                          </div>
-                          {!item.isSeasoning
-                            ? <div className="num-ctrl">
-                                <button className="num-btn" onClick={() => adjustShopping(item.name, -1, item.unit)}>−</button>
-                                <span style={{ minWidth: 60, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
-                                <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit)}>＋</button>
-                              </div>
-                            : <span style={{ fontSize: 13, color: "#8a7050" }}>{item.amount}{item.unit}</span>}
-                          <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => item.isManual ? removeManualItem(item.name) : removeShoppingItem(item.name)}>✕</button>
+                          <div style={{ flex: 1, fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
+                          <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => removeDrugItem(item.name)}>✕</button>
                         </div>
                       )
                     })}
                   </div>
-                </div>
-              )
-            })}
-            {checkedItems.length > 0 && <div style={{ textAlign: "center", padding: "8px", fontSize: 12, color: "#8a7050" }}>{checkedItems.length}品チェック済み</div>}
+                )}
+              </>
+            )}
           </div>
         )}
 
