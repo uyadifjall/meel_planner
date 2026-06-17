@@ -27,6 +27,52 @@ function normalizeUnit(amount, unit) {
   return { amount, unit }
 }
 
+// ── 表記ゆれ吸収（ひらがな・カタカナ統一＋よくある別名辞書） ──
+// カタカナ→ひらがな変換
+function katakanaToHiragana(str) {
+  return str.replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+}
+
+// よくある食材名の表記ゆれ辞書（読みが同じでも漢字/別名が異なるもの）
+const INGREDIENT_ALIASES = {
+  "ねぎ": "長ねぎ", "ネギ": "長ねぎ", "葱": "長ねぎ", "白ねぎ": "長ねぎ",
+  "人参": "にんじん", "ニンジン": "にんじん",
+  "玉葱": "玉ねぎ", "タマネギ": "玉ねぎ", "たまねぎ": "玉ねぎ",
+  "じゃが芋": "じゃがいも", "ジャガイモ": "じゃがいも", "馬鈴薯": "じゃがいも",
+  "豚バラ": "豚バラ肉", "豚ばら": "豚バラ肉", "ぶたばら": "豚バラ肉",
+  "鶏むね": "鶏むね肉", "鶏もも": "鶏もも肉", "とりもも": "鶏もも肉", "とりむね": "鶏むね肉",
+  "牛こま": "牛こま肉", "牛肉（薄切り）": "牛薄切り肉", "牛バラ": "牛バラ肉",
+  "しょうゆ": "醤油", "しょう油": "醤油", "正油": "醤油",
+  "味醂": "みりん", "上白糖": "砂糖", "グラニュー糖": "砂糖",
+  "片栗粉": "片栗粉", "コーンスターチ": "片栗粉",
+  "椎茸": "しいたけ", "しいたけ": "しいたけ", "シイタケ": "しいたけ",
+  "大蒜": "にんにく", "ニンニク": "にんにく", "ガーリック": "にんにく",
+  "生姜": "しょうが", "ショウガ": "しょうが", "ジンジャー": "しょうが",
+  "胡瓜": "きゅうり", "キュウリ": "きゅうり",
+  "茄子": "なす", "ナス": "なす",
+  "南瓜": "かぼちゃ", "カボチャ": "かぼちゃ",
+  "大根": "大根", "だいこん": "大根",
+  "白菜": "白菜", "はくさい": "白菜",
+  "豆腐": "豆腐", "とうふ": "豆腐",
+  "卵": "卵", "玉子": "卵", "たまご": "卵",
+}
+
+// 食材名を正規化（表記ゆれを統一）
+function normalizeIngredientName(name) {
+  if (!name) return name
+  const trimmed = name.trim()
+  // 1. 辞書に直接マッチ
+  if (INGREDIENT_ALIASES[trimmed]) return INGREDIENT_ALIASES[trimmed]
+  // 2. カタカナをひらがなに変換してから辞書を再チェック
+  const hiraVersion = katakanaToHiragana(trimmed)
+  if (INGREDIENT_ALIASES[hiraVersion]) return INGREDIENT_ALIASES[hiraVersion]
+  // 3. 辞書の値（正規化後の名前）をひらがな化したものと比較し、一致すれば統一
+  for (const [key, val] of Object.entries(INGREDIENT_ALIASES)) {
+    if (katakanaToHiragana(key) === hiraVersion) return val
+  }
+  return trimmed
+}
+
 function mergeIngredientsAdvanced(selections, recipes) {
   const map = {}
   selections.forEach(sel => {
@@ -35,8 +81,9 @@ function mergeIngredientsAdvanced(selections, recipes) {
     recipe.ingredients.filter(i => i.type === "通常食材").forEach(ing => {
       const parsed = parseAmount(ing.amount)
       const { amount, unit } = normalizeUnit(parsed * sel.portion, ing.unit)
-      const key = `${ing.name}__${unit}`
-      if (!map[key]) map[key] = { ...ing, amount: 0, unit }
+      const normalizedName = normalizeIngredientName(ing.name)
+      const key = `${normalizedName}__${unit}`
+      if (!map[key]) map[key] = { ...ing, name: normalizedName, amount: 0, unit }
       map[key].amount += amount
     })
   })
@@ -49,9 +96,10 @@ function mergeSeasonings(selections, recipes) {
     const r = recipes.find(r => r.id === sel.recipeId)
     if (!r) return
     r.ingredients.filter(i => i.type === "調味料").forEach(ing => {
-      if (!map[ing.name]) map[ing.name] = { ...ing, totalAmount: 0, recipes: [] }
-      map[ing.name].totalAmount += (parseAmount(ing.amount) || 0) * sel.portion
-      if (!map[ing.name].recipes.includes(r.name)) map[ing.name].recipes.push(r.name)
+      const normalizedName = normalizeIngredientName(ing.name)
+      if (!map[normalizedName]) map[normalizedName] = { ...ing, name: normalizedName, totalAmount: 0, recipes: [] }
+      map[normalizedName].totalAmount += (parseAmount(ing.amount) || 0) * sel.portion
+      if (!map[normalizedName].recipes.includes(r.name)) map[normalizedName].recipes.push(r.name)
     })
   })
   return Object.values(map)
@@ -213,7 +261,7 @@ function LoginScreen({ onLogin }) {
     <div className="login-wrap">
       <div style={{ marginBottom: 32, textAlign: "center" }}>
         <div style={{ fontSize: 48, marginBottom: 8 }}>🥢</div>
-        <div style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 26, fontWeight: 700, color: "#3d2b08" }}>週献立ノート</div>
+        <div style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 26, fontWeight: 700, color: "#3d2b08" }}>CookFlow</div>
         <div style={{ fontSize: 11, color: "#b09070", marginTop: 4, letterSpacing: "0.12em" }}>WEEKLY MENU PLANNER</div>
       </div>
       <div className="login-card">
@@ -583,7 +631,7 @@ export default function App() {
       <header style={{ background: "#3d2b08", color: "#f8f0e4", padding: "13px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, position: "sticky", top: 0, zIndex: 50 }}>
         <span style={{ fontSize: 20 }}>🥢</span>
         <div>
-          <div style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 17, fontWeight: 700, letterSpacing: "0.1em" }}>週献立ノート</div>
+          <div style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 17, fontWeight: 700, letterSpacing: "0.1em" }}>CookFlow</div>
           <div style={{ fontSize: 9, color: "#c9b090", letterSpacing: "0.15em" }}>WEEKLY MENU PLANNER</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
