@@ -164,10 +164,10 @@ body{background:#f8f5f0;}
 .screen{flex:1;overflow-y:auto;padding-bottom:88px;}
 .card{background:#fff;border-radius:16px;box-shadow:0 1px 8px rgba(80,60,20,0.07);}
 .btn{border:none;border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
-.btn-primary{background:#3d2b08;color:#fff;padding:11px 20px;font-size:14px;}
-.btn-primary:hover{background:#2a1c04;}
+.btn-primary{background:#a8470f;color:#fff;padding:11px 20px;font-size:14px;}
+.btn-primary:hover{background:#8a3a0c;}
 .btn-primary:disabled{background:#a09080;cursor:not-allowed;}
-.btn-outline{background:#fff;color:#3d2b08;border:1.5px solid #d4c5b0;padding:9px 16px;font-size:13px;}
+.btn-outline{background:#fff;color:#a8470f;border:1.5px solid #d4c5b0;padding:9px 16px;font-size:13px;}
 .btn-outline:hover{background:#f5ede0;}
 .btn-ghost{background:transparent;color:#8a7050;border:none;padding:6px 10px;font-size:13px;cursor:pointer;}
 .btn-sm{padding:6px 12px;font-size:12px;border-radius:8px;}
@@ -178,7 +178,7 @@ body{background:#f8f5f0;}
 .tag-副菜{background:#e0f0e8;color:#1b7a3e;}
 .tag-お弁当{background:#e8e4f8;color:#4a2fa0;}
 input,select,textarea{font-family:inherit;border:1.5px solid #e0d4c0;border-radius:10px;padding:10px 13px;font-size:14px;width:100%;background:#fdfaf6;color:#1a1208;outline:none;transition:border .15s;}
-input:focus,select:focus,textarea:focus{border-color:#3d2b08;box-shadow:0 0 0 3px rgba(61,43,8,0.07);}
+input:focus,select:focus,textarea:focus{border-color:#a8470f;box-shadow:0 0 0 3px rgba(61,43,8,0.07);}
 input[type=date]{cursor:pointer;}
 .overlay{position:fixed;inset:0;background:rgba(26,18,8,.55);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
 .sheet{background:#fdfaf6;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;padding:24px 20px 40px;animation:slideUp .25s;}
@@ -187,22 +187,22 @@ input[type=date]{cursor:pointer;}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .pill-btn{border:1.5px solid #d4c5b0;border-radius:20px;background:#fff;color:#5a4020;padding:6px 14px;font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s;font-weight:500;}
-.pill-btn.active{background:#3d2b08;color:#fff;border-color:#3d2b08;}
+.pill-btn.active{background:#a8470f;color:#fff;border-color:#a8470f;}
 .section-head{font-size:11px;font-weight:700;color:#b09070;letter-spacing:.1em;padding:0 4px;margin-bottom:6px;}
 .item-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #f0e8d8;gap:10px;background:#fff;}
 .item-row:last-child{border-bottom:none;}
 .num-ctrl{display:inline-flex;align-items:center;gap:4px;}
-.num-btn{width:28px;height:28px;border:1.5px solid #d4c5b0;border-radius:8px;background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#3d2b08;font-weight:700;}
+.num-btn{width:28px;height:28px;border:1.5px solid #d4c5b0;border-radius:8px;background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#a8470f;font-weight:700;}
 .num-btn:hover{background:#f5ede0;}
 .check-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f0e8d8;cursor:pointer;}
 .check-row:last-child{border-bottom:none;}
 .custom-check{width:22px;height:22px;border:2px solid #d4c5b0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
-.custom-check.checked{background:#3d2b08;border-color:#3d2b08;color:#fff;}
+.custom-check.checked{background:#a8470f;border-color:#a8470f;color:#fff;}
 .fav-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:2px;line-height:1;}
 .history-week{border-radius:12px;overflow:hidden;border:1.5px solid #e8dcc8;}
 .empty-state{text-align:center;padding:60px 20px;color:#b09070;}
-.portion-select{border:1.5px solid #d4c5b0;border-radius:8px;background:#fff;color:#3d2b08;padding:5px 8px;font-size:12px;font-family:inherit;cursor:pointer;}
-.toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#3d2b08;color:#fff;border-radius:20px;padding:8px 20px;font-size:12px;z-index:400;animation:fadeIn .2s;white-space:nowrap;pointer-events:none;}
+.portion-select{border:1.5px solid #d4c5b0;border-radius:8px;background:#fff;color:#a8470f;padding:5px 8px;font-size:12px;font-family:inherit;cursor:pointer;}
+.toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#a8470f;color:#fff;border-radius:20px;padding:8px 20px;font-size:12px;z-index:400;animation:fadeIn .2s;white-space:nowrap;pointer-events:none;}
 .toast.error{background:#c0391b;}
 .toast.warn{background:#8a6000;}
 .error-msg{color:#c0391b;font-size:12px;margin-top:6px;padding:8px 12px;background:#fff0ee;border-radius:8px;}
@@ -210,16 +210,16 @@ input[type=date]{cursor:pointer;}
 .login-card{background:#fff;border-radius:20px;padding:36px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(61,43,8,0.12);}
 .tab-toggle{display:flex;border-radius:10px;background:#f0e8d8;padding:3px;gap:3px;margin-bottom:24px;}
 .tab-toggle button{flex:1;border:none;border-radius:8px;padding:9px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;}
-.tab-toggle button.active{background:#3d2b08;color:#fff;}
+.tab-toggle button.active{background:#a8470f;color:#fff;}
 .tab-toggle button:not(.active){background:transparent;color:#8a7050;}
 .step-row{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start;}
-.step-num{width:28px;height:28px;border-radius:50%;background:#3d2b08;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.step-num{width:28px;height:28px;border-radius:50%;background:#a8470f;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
 .step-text{flex:1;line-height:1.7;font-size:14px;color:#2c1e08;}
 .ing-chip{display:inline-flex;align-items:center;background:#faf3e8;border:1px solid #e8d8c0;border-radius:8px;padding:6px 12px;font-size:13px;gap:6px;}
-.ing-amount{font-weight:700;color:#3d2b08;}
-.detail-header{background:#3d2b08;color:#f8f0e4;padding:16px 20px 20px;}
+.ing-amount{font-weight:700;color:#a8470f;}
+.detail-header{background:#a8470f;color:#f8f0e4;padding:16px 20px 20px;}
 .url-btn{display:flex;align-items:center;gap:8px;background:#fff7ed;border:1.5px solid #e8c87a;border-radius:12px;padding:12px 16px;color:#8a6010;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;width:100%;text-decoration:none;}
-.spinner{width:36px;height:36px;border:3px solid #e8dcc8;border-top-color:#3d2b08;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
+.spinner{width:36px;height:36px;border:3px solid #e8dcc8;border-top-color:#a8470f;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
 .date-entry{background:#fff;border-radius:12px;border:1.5px solid #e8dcc8;margin-bottom:8px;overflow:hidden;}
 .date-entry-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fdfaf6;border-bottom:1px solid #f0e8d8;}
 .bento-section{background:#f0ebfa;border:1.5px solid #c8b8f0;border-radius:12px;margin-bottom:12px;overflow:hidden;}
@@ -260,8 +260,8 @@ function LoginScreen({ onLogin }) {
   return (
     <div className="login-wrap">
       <div style={{ marginBottom: 32, textAlign: "center" }}>
-        <div style={{ fontSize: 48, marginBottom: 8 }}>🥢</div>
-        <div style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 26, fontWeight: 700, color: "#3d2b08" }}>CookFlow</div>
+        <img src="/icon-512.png" alt="CookFlow" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: 8, boxShadow: "0 4px 16px rgba(200,90,20,0.25)" }} />
+        <div style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 26, fontWeight: 700, color: "#a8470f" }}>CookFlow</div>
         <div style={{ fontSize: 11, color: "#b09070", marginTop: 4, letterSpacing: "0.12em" }}>WEEKLY MENU PLANNER</div>
       </div>
       <div className="login-card">
@@ -302,7 +302,7 @@ function RecipeDetailSheet({ recipe, onClose, onEdit }) {
         {recipe.url && <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0e8d8" }}><a href={recipe.url} target="_blank" rel="noopener noreferrer" className="url-btn"><span style={{ fontSize: 18 }}>▶️</span><span>参考動画・レシピを見る</span><span style={{ marginLeft: "auto", fontSize: 11, color: "#b09070" }}>外部リンク →</span></a></div>}
         <div style={{ display: "flex", borderBottom: "2px solid #f0e8d8", background: "#fff" }}>
           {[{ id: "steps", label: "👨‍🍳 作り方" }, { id: "ingredients", label: "🥬 材料" }].map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, border: "none", background: "none", padding: "13px", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: activeTab === t.id ? "#3d2b08" : "#b09070", borderBottom: activeTab === t.id ? "2px solid #3d2b08" : "2px solid transparent", marginBottom: -2, transition: "all .15s" }}>{t.label}</button>
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, border: "none", background: "none", padding: "13px", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: activeTab === t.id ? "#a8470f" : "#b09070", borderBottom: activeTab === t.id ? "2px solid #a8470f" : "2px solid transparent", marginBottom: -2, transition: "all .15s" }}>{t.label}</button>
           ))}
         </div>
         {activeTab === "steps" && <div style={{ padding: "20px 16px" }}>
@@ -626,7 +626,7 @@ export default function App() {
   if (autoLogging) return (
     <><style>{CSS}</style>
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f8f5f0" }}>
-      <div style={{ fontSize: 48, marginBottom: 20 }}>🥢</div>
+      <img src="/icon-512.png" alt="CookFlow" style={{ width: 64, height: 64, borderRadius: 16, marginBottom: 20, boxShadow: "0 4px 16px rgba(200,90,20,0.2)" }} />
       <div className="spinner" />
       <div style={{ fontSize: 13, color: "#b09070" }}>データを読み込んでいます...</div>
     </div></>
@@ -647,8 +647,8 @@ export default function App() {
       <style>{CSS}</style>
       {toast && <div className={`toast ${toast.type === "error" ? "error" : toast.type === "warn" ? "warn" : ""}`}>{toast.msg}</div>}
 
-      <header style={{ background: "#3d2b08", color: "#f8f0e4", padding: "13px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, position: "sticky", top: 0, zIndex: 50 }}>
-        <span style={{ fontSize: 20 }}>🥢</span>
+      <header style={{ background: "#a8470f", color: "#f8f0e4", padding: "13px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, position: "sticky", top: 0, zIndex: 50 }}>
+        <img src="/icon-512.png" alt="CookFlow" style={{ width: 32, height: 32, borderRadius: 8 }} />
         <div>
           <div style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 17, fontWeight: 700, letterSpacing: "0.1em" }}>CookFlow</div>
           <div style={{ fontSize: 9, color: "#c9b090", letterSpacing: "0.15em" }}>WEEKLY MENU PLANNER</div>
@@ -740,7 +740,7 @@ export default function App() {
 
             {/* 通常献立 */}
             <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "#3d2b08" }}>🍽️ 夕食・その他の献立</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#a8470f" }}>🍽️ 夕食・その他の献立</div>
               <button className="btn btn-outline btn-sm" onClick={addPlanEntry}>＋ 日を追加</button>
             </div>
             {sortedEntries.length === 0 && <div style={{ textAlign: "center", padding: "20px", color: "#b09070", fontSize: 13 }}>「＋ 日を追加」から始めよう</div>}
@@ -852,7 +852,7 @@ export default function App() {
                           const isChecked = checkedItems.includes(item.name)
                           return (
                             <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f8f5f0" : "#fff" }}>
-                              <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#3d2b08" : "#d4c5b0"}`, background: isChecked ? "#3d2b08" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
+                              <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#a8470f" : "#d4c5b0"}`, background: isChecked ? "#a8470f" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
                                 {isChecked ? "✓" : ""}
                               </div>
                               <div style={{ flex: 1 }}>
@@ -956,10 +956,10 @@ export default function App() {
 
       <nav style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#fff", borderTop: "1px solid #e8dcc8", display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
         {navItems.map(n => (
-          <button key={n.id} onClick={() => setScreen(n.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, fontFamily: "inherit", color: screen === n.id ? "#3d2b08" : "#b09070", transition: "color .15s" }}>
+          <button key={n.id} onClick={() => setScreen(n.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, fontFamily: "inherit", color: screen === n.id ? "#a8470f" : "#b09070", transition: "color .15s" }}>
             <span style={{ fontSize: 20 }}>{n.icon}</span>
             <span style={{ fontSize: 10, fontWeight: screen === n.id ? 700 : 400 }}>{n.label}</span>
-            {screen === n.id && <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#3d2b08" }} />}
+            {screen === n.id && <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#a8470f" }} />}
           </button>
         ))}
       </nav>
@@ -983,7 +983,7 @@ export default function App() {
               <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 6, fontWeight: 700 }}>保存される献立</div>
               {sortedEntries.filter(e => !e.skip && e.recipeId).slice(0, 4).map((e, i) => {
                 const r = recipes.find(r => r.id === e.recipeId)
-                return <div key={i} style={{ fontSize: 13, color: "#3d2b08", marginBottom: 2 }}>・{e.date ? formatDateLabel(e.date) : ""} {r?.name}</div>
+                return <div key={i} style={{ fontSize: 13, color: "#a8470f", marginBottom: 2 }}>・{e.date ? formatDateLabel(e.date) : ""} {r?.name}</div>
               })}
               {bentoEntries.filter(e => e.recipeId).slice(0, 2).map((e, i) => {
                 const r = recipes.find(r => r.id === e.recipeId)
@@ -1048,7 +1048,7 @@ function RegisterSheet({ recipe, onSave, onClose }) {
   const setIng = (i, k, v) => setForm(f => ({ ...f, ingredients: f.ingredients.map((x, j) => j === i ? { ...x, [k]: v } : x) }))
   const addIng = () => setForm(f => ({ ...f, ingredients: [...f.ingredients, { name: "", amount: "", unit: "g", type: "通常食材", category: "野菜・果物" }] }))
   const removeIng = i => setForm(f => ({ ...f, ingredients: f.ingredients.filter((_, j) => j !== i) }))
-  const tabStyle = id => ({ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: regTab === id ? "#3d2b08" : "#b09070", borderBottom: regTab === id ? "2px solid #3d2b08" : "2px solid transparent", transition: "all .15s" })
+  const tabStyle = id => ({ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: regTab === id ? "#a8470f" : "#b09070", borderBottom: regTab === id ? "2px solid #a8470f" : "2px solid transparent", transition: "all .15s" })
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="sheet">
