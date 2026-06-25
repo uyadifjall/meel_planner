@@ -540,7 +540,9 @@ export default function App() {
   , [baseShoppingList, shoppingAdjust, deletedItems])
 
   const adjustShopping = (name, delta, unit) => {
-    const step = ["個","本","袋","枚","パック","片","束"].includes(unit) ? 1 : 10
+    // g・ml系は10刻み、それ以外（個・本・缶・人前・枚 etc）は1刻み
+    const bigStep = ["g","ml","cc"].includes(unit)
+    const step = bigStep ? 10 : 1
     const cur = shoppingAdjust[name] !== undefined ? shoppingAdjust[name] : (parseAmount(baseShoppingList.find(i => i.name === name)?.amount) || 0)
     const next = { ...shoppingAdjust, [name]: Math.max(0, Math.round((cur + delta * step) * 10) / 10) }
     setShoppingAdjust(next); triggerSave(buildSave({ shoppingAdjust: next }))
@@ -727,9 +729,13 @@ export default function App() {
                   {entry.recipeId && (
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <select className="portion-select" value={entry.portion} onChange={e => updateBentoEntry(entry.id, { portion: Number(e.target.value) })}>
+                        <option value={0.5}>0.5回分（1人前）</option>
                         <option value={1}>1回分（2人前）</option>
+                        <option value={1.5}>1.5回分（3人前）</option>
                         <option value={2}>2回分（4人前）</option>
+                        <option value={2.5}>2.5回分（5人前）</option>
                         <option value={3}>3回分（6人前）</option>
+                        <option value={4}>4回分（8人前）</option>
                       </select>
                       <input placeholder="メモ（例：月〜水用）" value={entry.note || ""} onChange={e => updateBentoEntry(entry.id, { note: e.target.value })} style={{ flex: 1, fontSize: 12, padding: "6px 10px" }} />
                     </div>
@@ -744,41 +750,99 @@ export default function App() {
               <button className="btn btn-outline btn-sm" onClick={addPlanEntry}>＋ 日を追加</button>
             </div>
             {sortedEntries.length === 0 && <div style={{ textAlign: "center", padding: "20px", color: "#b09070", fontSize: 13 }}>「＋ 日を追加」から始めよう</div>}
-            {sortedEntries.map((entry, idx) => (
-              <div key={entry.id} className="date-entry">
-                <div className="date-entry-header">
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(entry.id, -1)} disabled={idx === 0}>▲</button>
-                    <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(entry.id, 1)} disabled={idx === sortedEntries.length - 1}>▼</button>
-                  </div>
-                  <input type="date" value={entry.date || ""} onChange={e => updateEntry(entry.id, { date: e.target.value })} style={{ width: 148, fontSize: 13, padding: "6px 8px", flex: "0 0 auto" }} />
-                  <div style={{ fontSize: 12, color: "#8a7050", minWidth: 76 }}>{entry.date ? formatDateLabel(entry.date) : "日付未設定"}</div>
-                  <button onClick={() => updateEntry(entry.id, { skip: !entry.skip })} style={{ marginLeft: "auto", background: entry.skip ? "#f0e8d8" : "none", border: "1.5px solid #d4c5b0", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: entry.skip ? "#8a7050" : "#c0a880", fontWeight: 600 }}>
-                    {entry.skip ? "スキップ中" : "スキップ"}
-                  </button>
-                  <button className="btn-icon" style={{ color: "#c0391b" }} onClick={() => removeEntry(entry.id)}>✕</button>
-                </div>
-                {!entry.skip && (
-                  <div style={{ padding: "10px 14px" }}>
-                    <select value={entry.recipeId || ""} onChange={e => updateEntry(entry.id, { recipeId: e.target.value ? Number(e.target.value) : null })} style={{ fontSize: 13, padding: "8px 10px", marginBottom: entry.recipeId ? 8 : 0 }}>
-                      <option value="">── レシピを選択 ──</option>
-                      {recipes.map(r => <option key={r.id} value={r.id}>{r.name}（{r.tag}）</option>)}
-                    </select>
-                    {entry.recipeId && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <select className="portion-select" value={entry.portion} onChange={e => updateEntry(entry.id, { portion: Number(e.target.value) })}>
-                          <option value={1}>1日分（2人前）</option>
-                          <option value={2}>2日分（4人前）</option>
-                          <option value={3}>3日分（6人前）</option>
-                        </select>
-                        <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => setDetailRecipe(recipes.find(r => r.id === entry.recipeId))}>レシピ確認 →</button>
+            {(() => {
+              // 日付でグループ化（同じ日付のエントリをまとめる）
+              const groups = []
+              const seen = {}
+              sortedEntries.forEach((entry, idx) => {
+                const key = entry.date || `__nodate_${idx}`
+                if (!seen[key]) { seen[key] = []; groups.push({ date: entry.date, key, entries: seen[key] }) }
+                seen[key].push({ entry, idx })
+              })
+              return groups.map((group, gIdx) => {
+                const firstIdx = group.entries[0]?.idx ?? 0
+                const lastIdx = group.entries[group.entries.length - 1]?.idx ?? 0
+                return (
+                  <div key={group.key} className="date-entry">
+                    {/* 日付ヘッダー（グループ共通） */}
+                    <div className="date-entry-header">
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(group.entries[0].entry.id, -1)} disabled={firstIdx === 0}>▲</button>
+                        <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(group.entries[group.entries.length-1].entry.id, 1)} disabled={lastIdx === sortedEntries.length - 1}>▼</button>
                       </div>
-                    )}
+                      <input type="date" value={group.date || ""}
+                        onChange={e => {
+                          // グループ内の全エントリの日付を一括更新
+                          const newDate = e.target.value
+                          const next = planEntries.map(pe => group.entries.find(g => g.entry.id === pe.id) ? { ...pe, date: newDate } : pe)
+                          setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
+                        }}
+                        style={{ width: 148, fontSize: 13, padding: "6px 8px", flex: "0 0 auto" }} />
+                      <div style={{ fontSize: 12, color: "#8a7050", minWidth: 76 }}>{group.date ? formatDateLabel(group.date) : "日付未設定"}</div>
+                      {/* スキップ：グループの最初のエントリで代表 */}
+                      <button onClick={() => {
+                        const isSkipped = group.entries[0].entry.skip
+                        const next = planEntries.map(pe => group.entries.find(g => g.entry.id === pe.id) ? { ...pe, skip: !isSkipped } : pe)
+                        setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
+                      }} style={{ marginLeft: "auto", background: group.entries[0].entry.skip ? "#f0e8d8" : "none", border: "1.5px solid #d4c5b0", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: group.entries[0].entry.skip ? "#8a7050" : "#c0a880", fontWeight: 600 }}>
+                        {group.entries[0].entry.skip ? "スキップ中" : "スキップ"}
+                      </button>
+                      <button className="btn-icon" style={{ color: "#c0391b" }} onClick={() => {
+                        // グループ内の全エントリを削除
+                        const ids = group.entries.map(g => g.entry.id)
+                        const next = planEntries.filter(pe => !ids.includes(pe.id))
+                        setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
+                      }}>✕</button>
+                    </div>
+
+                    {group.entries[0].entry.skip
+                      ? <div style={{ padding: "10px 14px", fontSize: 13, color: "#c0a880" }}>外食・お休みの日</div>
+                      : <>
+                          {/* グループ内の各メニュー */}
+                          {group.entries.map(({ entry }, mIdx) => (
+                            <div key={entry.id} style={{ padding: "10px 14px", borderTop: mIdx > 0 ? "1px dashed #e8dcc8" : "none", display: "flex", flexDirection: "column", gap: 8 }}>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                {group.entries.length > 1 && (
+                                  <span style={{ fontSize: 11, color: "#a8470f", fontWeight: 700, minWidth: 20 }}>{mIdx + 1}.</span>
+                                )}
+                                <select value={entry.recipeId || ""} onChange={e => updateEntry(entry.id, { recipeId: e.target.value ? Number(e.target.value) : null })} style={{ flex: 1, fontSize: 13, padding: "7px 10px" }}>
+                                  <option value="">── レシピを選択 ──</option>
+                                  {recipes.map(r => <option key={r.id} value={r.id}>{r.name}（{r.tag}）</option>)}
+                                </select>
+                                {group.entries.length > 1 && (
+                                  <button className="btn-icon" style={{ color: "#c0391b", fontSize: 14 }} onClick={() => removeEntry(entry.id)}>✕</button>
+                                )}
+                              </div>
+                              {entry.recipeId && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: group.entries.length > 1 ? 28 : 0 }}>
+                                  <select className="portion-select" value={entry.portion} onChange={e => updateEntry(entry.id, { portion: Number(e.target.value) })}>
+                                    <option value={0.5}>0.5日分（1人前）</option>
+                                    <option value={1}>1日分（2人前）</option>
+                                    <option value={1.5}>1.5日分（3人前）</option>
+                                    <option value={2}>2日分（4人前）</option>
+                                    <option value={2.5}>2.5日分（5人前）</option>
+                                    <option value={3}>3日分（6人前）</option>
+                                    <option value={4}>4日分（8人前）</option>
+                                  </select>
+                                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => setDetailRecipe(recipes.find(r => r.id === entry.recipeId))}>レシピ確認 →</button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {/* この日にメニューを追加するボタン */}
+                          <div style={{ padding: "8px 14px", borderTop: "1px dashed #e8dcc8" }}>
+                            <button className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: "#a8470f" }} onClick={() => {
+                              const newEntry = { id: Date.now(), date: group.date, recipeId: null, portion: 1, skip: false }
+                              const next = [...planEntries, newEntry]
+                              setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
+                            }}>＋ この日にメニューを追加</button>
+                          </div>
+                        </>
+                    }
                   </div>
-                )}
-                {entry.skip && <div style={{ padding: "10px 14px", fontSize: 13, color: "#c0a880" }}>外食・お休みの日</div>}
-              </div>
-            ))}
+                )
+              })
+            })()}
 
             {(planEntries.some(e => !e.skip && e.recipeId) || bentoEntries.some(e => e.recipeId)) && (
               <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
