@@ -192,12 +192,19 @@ async function pickAvailableModel(apiKey) {
   return names[0] || null
 }
 
+// 無料枠は混雑で 503 / 500 が返ることがあるので、少し待って最大2回やり直す
 async function callGemini(apiKey, model, payload) {
-  return fetch(`${GEMINI_BASE}/models/${model}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify(payload),
-  })
+  let res
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise(r => setTimeout(r, 2000 * attempt))
+    res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify(payload),
+    })
+    if (res.status !== 503 && res.status !== 500) break
+  }
+  return res
 }
 
 export async function geminiExtract({ apiKey, model, text, youtubeUrl }) {
@@ -218,6 +225,7 @@ export async function geminiExtract({ apiKey, model, text, youtubeUrl }) {
     const detail = (() => { try { return JSON.parse(body).error?.message || "" } catch { return "" } })()
     console.error("Gemini error", res.status, detail)
     if (res.status === 429) throw new Error("AIの無料枠の上限に達しました。しばらく待ってから試してください")
+    if (res.status === 503 || res.status === 500) throw new Error("AIが混み合っています。1〜2分おいてもう一度試してください")
     if (/API key/i.test(detail)) throw new Error("GEMINI_API_KEY が正しくありません。Vercel の設定を確認してください")
     throw new Error(`AIの呼び出しに失敗しました（${res.status}${detail ? `: ${detail.slice(0, 120)}` : ""}）`)
   }
