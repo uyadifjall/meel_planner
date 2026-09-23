@@ -6,7 +6,7 @@
 import { lookup } from "node:dns/promises"
 import net from "node:net"
 import {
-  extractJsonLdRecipe, extractCookpadRecipe, extractBazurecipe, parsePlainRecipe, htmlToText, getYouTubeId, geminiExtract, cleanText,
+  extractJsonLdRecipe, extractCookpadRecipe, extractBazurecipe, bazurecipeFromContent, parsePlainRecipe, htmlToText, getYouTubeId, geminiExtract, cleanText,
 } from "./_recipe.js"
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -72,6 +72,7 @@ async function fetchHtml(url) {
 // 2. 動画ページ（クラウドのサーバーからだとボット確認で弾かれることがある）
 // 3. oEmbed（タイトルだけ）
 async function fetchYouTubeInfo(videoId, apiKey) {
+  let apiError = ""
   if (apiKey) {
     try {
       const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&hl=ja&id=${encodeURIComponent(videoId)}&key=${encodeURIComponent(apiKey)}`,
@@ -79,23 +80,47 @@ async function fetchYouTubeInfo(videoId, apiKey) {
       if (r.ok) {
         const s = (await r.json()).items?.[0]?.snippet
         if (s) return { title: s.localized?.title || s.title || "", description: s.localized?.description || s.description || "", via: "api" }
-      } else console.error("YouTube Data API", r.status, (await r.text()).slice(0, 200))
-    } catch (e) { console.error("YouTube Data API", e.message) }
+      } else {
+        const body = await r.text()
+        apiError = `${r.status} ${(() => { try { return JSON.parse(body).error?.message || "" } catch { return body.slice(0, 120) } })()}`.slice(0, 200)
+        console.error("YouTube Data API", apiError)
+      }
+    } catch (e) { apiError = e.message; console.error("YouTube Data API", e.message) }
   }
   try {
     const html = await fetchHtml(`https://www.youtube.com/watch?v=${videoId}&hl=ja`)
     const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]+?\})\s*;\s*(?:var\s|<\/script>)/)
     if (m) {
       const d = JSON.parse(m[1]).videoDetails || {}
-      if (d.shortDescription) return { title: d.title || "", description: d.shortDescription, via: "page" }
+      if (d.shortDescription) return { title: d.title || "", description: d.shortDescription, via: "page", apiError }
     }
   } catch {}
   // 取れなければ oEmbed でタイトルだけ
   try {
     const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`)
-    if (res.ok) return { title: (await res.json()).title || "", description: "", via: "oembed" }
+    if (res.ok) return { title: (await res.json()).title || "", description: "", via: "oembed", apiError }
   } catch {}
-  return { title: "", description: "", via: "none" }
+  return { title: "", description: "", via: "none", apiError }
+}
+
+// バズレシピ.com の記事を WordPress REST API から取る（URL末尾のスラッグ → 投稿）
+async function fetchBazurecipeViaApi(url) {
+  const slug = decodeURIComponent(new URL(url).pathname.split("/").filter(Boolean).pop() || "")
+  if (!slug) return null
+  const tries = [`https://bazurecipe.com/wp-json/wp/v2/posts?slug=${encodeURIComponent(slug)}&_fields=title,content`]
+  if (/^\d+$/.test(slug)) tries.push(`https://bazurecipe.com/wp-json/wp/v2/posts/${slug}?_fields=title,content`)
+  for (const api of tries) {
+    try {
+      const r = await fetch(api, { headers: { "User-Agent": UA, "Accept": "application/json" }, signal: AbortSignal.timeout(15000) })
+      if (!r.ok) { console.error("bazurecipe api", r.status); continue }
+      const j = await r.json()
+      const post = Array.isArray(j) ? j[0] : j
+      if (!post?.content?.rendered) continue
+      const recipe = bazurecipeFromContent(post.content.rendered, cleanText(post.title?.rendered || ""))
+      if (recipe) return recipe
+    } catch (e) { console.error("bazurecipe api", e.message) }
+  }
+  return null
 }
 
 export default async function handler(req, res) {
@@ -125,11 +150,12 @@ export default async function handler(req, res) {
     const videoId = getYouTubeId(url)
     if (videoId) {
       const watchUrl = `https://www.youtube.com/watch?v=${videoId}`
-      const { title, description, via } = await fetchYouTubeInfo(videoId, process.env.YOUTUBE_API_KEY || apiKey)
+      const { title, description, via, apiError } = await fetchYouTubeInfo(videoId, process.env.YOUTUBE_API_KEY || apiKey)
       // 概要欄に「材料…分量」の形で書かれていれば AI なしで読める
       const plain = description ? parsePlainRecipe(description, title) : null
       if (plain) { res.status(200).json({ recipe: { ...plain, url: watchUrl }, source: "youtube-text", via }); return }
       if (!apiKey) return noKey()
+      res.setHeader?.("x-youtube-desc", `${via}${apiError ? "; api=" + encodeURIComponent(apiError) : ""}`)
       let recipe = null
       if (description.trim()) {
         recipe = await geminiExtract({ apiKey, model, text: `動画タイトル: ${title}\n\n概要欄:\n${description}` })
@@ -146,8 +172,19 @@ export default async function handler(req, res) {
       return
     }
 
-    const html = await fetchHtml(url)
-    if (/(^|\.)cookpad\.com$/.test(new URL(url).hostname)) {
+    const host = new URL(url).hostname
+    let html
+    try { html = await fetchHtml(url) }
+    catch (e) {
+      // バズレシピ.com はクラウドのサーバーからのページ取得を拒否するので、WordPress の API を試す
+      if (/(^|\.)bazurecipe\.com$/.test(host)) {
+        const bz = await fetchBazurecipeViaApi(url)
+        if (bz) { res.status(200).json({ recipe: { ...bz, url }, source: "bazurecipe-api" }); return }
+        throw new Error("バズレシピ.com がこのサーバーからの読み取りを受け付けていません。ページの【材料】【作り方】をコピーして「文章から」に貼ってください（AIなしで読み取れます）")
+      }
+      throw e
+    }
+    if (/(^|\.)cookpad\.com$/.test(host)) {
       const cp = extractCookpadRecipe(html)
       if (cp) {
         const { truncated, ...recipe } = cp

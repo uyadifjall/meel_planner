@@ -263,6 +263,12 @@ export function extractBazurecipe(html) {
     .replace(/<(figure|blockquote|script|button)[\s\S]*?<\/\1>/gi, " ")
     .replace(/<div class='ai-viewports[^>]*><\/div>/g, " ")
   const title = decodeEntities((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").split(/\s+[-|｜]\s+/)[0]
+  return bazurecipeFromContent(body, title)
+}
+
+// 記事本文の HTML（WordPress API の content.rendered でも可）から読む
+export function bazurecipeFromContent(contentHtml, title) {
+  const body = String(contentHtml).replace(/<(figure|blockquote|script|button)[\s\S]*?<\/\1>/gi, " ")
   const recipe = parsePlainRecipe(htmlToText(body, 20000), title)
   if (recipe && title) recipe.name = title
   return recipe
