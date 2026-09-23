@@ -1452,6 +1452,47 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
     onSave({ ...form, ingredients, steps: form.steps.filter(s => s.trim()) })
   }
   const photoUrl = getRecipePhotoUrl(form.photoPath)
+
+  // ── URLから取り込み（レシピサイト・YouTube） ──
+  const [importUrl, setImportUrl] = useState("")
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState(null) // { type: "ok" | "error", text }
+  const runImport = async () => {
+    const url = importUrl.trim()
+    if (!url || importing) return
+    const hasContent = form.name || form.ingredients.some(i => i.name) || form.steps.some(s => s.trim())
+    if (hasContent && !window.confirm("入力中の料理名・材料・作り方を、取り込んだ内容で置き換えますか？")) return
+    setImporting(true); setImportMsg(null)
+    try {
+      const res = await fetch("/api/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.recipe) throw new Error(data.error || `取り込みに失敗しました（${res.status}）`)
+      const r = data.recipe
+      const ingredients = r.ingredients.map(i => {
+        const inferred = inferCategory(i.name)
+        const isSeasoning = i.isSeasoning ?? inferred === "調味料"
+        // 水は買い物リストに載せない
+        const type = isSeasoning || /^(水|お湯|湯|熱湯|氷)$/.test(i.name) ? "調味料" : "通常食材"
+        return { name: i.name, amount: i.amount, unit: i.unit, type, category: inferred || (type === "調味料" ? "調味料" : "野菜・果物"), _catAuto: true }
+      })
+      setForm(f => ({
+        ...f,
+        name: r.name || f.name,
+        url: r.url || url,
+        memo: r.memo || f.memo,
+        servings: r.servings || f.servings || 2,
+        steps: r.steps.length ? r.steps : [""],
+        ingredients: ingredients.length ? ingredients : [blankIng()],
+      }))
+      setImportMsg({ type: "ok", text: data.source === "jsonld"
+        ? `✓ サイトのレシピ情報から取り込みました（材料${ingredients.length}件・手順${r.steps.length}件）`
+        : `✓ AIで読み取りました（材料${ingredients.length}件・手順${r.steps.length}件）。分量と手順を確認してから保存してください` })
+      setImportUrl("")
+    } catch (e) {
+      setImportMsg({ type: "error", text: e.message || "取り込みに失敗しました" })
+    }
+    setImporting(false)
+  }
   const tabStyle = id => ({ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: regTab === id ? "#a8470f" : "#b09070", borderBottom: regTab === id ? "2px solid #a8470f" : "2px solid transparent", transition: "all .15s" })
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) handleClose() }}>
@@ -1467,6 +1508,15 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
         </div>
         {regTab === "basic" && (
           <div style={{ display: "grid", gap: 14 }}>
+            <div style={{ background: "#fff7ed", border: "1.5px solid #e8c87a", borderRadius: 12, padding: "12px 14px" }}>
+              <label style={{ fontSize: 11, color: "#8a6010", display: "block", marginBottom: 6, fontWeight: 700 }}>🔗 URLから取り込む（レシピサイト・YouTube）</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input placeholder="https://..." value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && runImport()} disabled={importing} inputMode="url" autoCapitalize="none" autoCorrect="off" style={{ flex: 1, fontSize: 13, padding: "8px 10px", background: "#fff" }} />
+                <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importUrl.trim()} style={{ whiteSpace: "nowrap" }}>{importing ? "読み取り中..." : "取り込む"}</button>
+              </div>
+              {importing && <div style={{ fontSize: 11, color: "#8a6010", marginTop: 6 }}>動画の場合は数十秒かかることがあります</div>}
+              {importMsg && <div className={importMsg.type === "error" ? "error-msg" : ""} style={importMsg.type === "error" ? {} : { fontSize: 12, color: "#1b7a3e", marginTop: 6, lineHeight: 1.5 }}>{importMsg.type === "error" ? `⚠️ ${importMsg.text}` : importMsg.text}</div>}
+            </div>
             <div>
               <label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>写真</label>
               <div className="photo-box" onClick={() => !uploading && fileInput.current?.click()} style={{ cursor: uploading ? "wait" : "pointer" }}>
