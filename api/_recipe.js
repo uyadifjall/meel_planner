@@ -250,6 +250,8 @@ export async function geminiExtract({ apiKey, model, text, youtubeUrl }) {
   // found フラグだけに頼らず、材料か手順が取れていればレシピとして扱う
   if (!recipe.ingredients.length && !recipe.steps.length) {
     console.error("Gemini found no recipe", JSON.stringify(data).slice(0, 500))
+    // 一時的な診断情報（原因がわかったら消す）
+    geminiExtract.lastDebug = { model: resolvedModel || model, finishReason: json.candidates?.[0]?.finishReason, out: out.slice(0, 300) }
     return null
   }
   return recipe

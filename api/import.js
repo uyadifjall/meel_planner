@@ -101,7 +101,7 @@ export default async function handler(req, res) {
     if (pasted) {
       if (!apiKey) return noKey()
       const recipe = await geminiExtract({ apiKey, model, text: `貼り付けられたレシピ:\n${pasted.slice(0, 15000)}` })
-      if (!recipe) { res.status(422).json({ error: "文章からレシピを読み取れませんでした" }); return }
+      if (!recipe) { res.status(422).json({ error: "文章からレシピを読み取れませんでした", debug: geminiExtract.lastDebug }); return }
       res.status(200).json({ recipe: { ...recipe, url: url || "" }, source: "ai-text" })
       return
     }

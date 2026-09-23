@@ -272,88 +272,88 @@ const SAMPLE_RECIPES = [
 
 // ── CSS ──
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&family=Zen+Old+Mincho:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&family=Zen+Maru+Gothic:wght@500;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:#f8f5f0;}
+body{background:#f6f2e9;}
 ::-webkit-scrollbar{width:4px;}
-::-webkit-scrollbar-thumb{background:#d4c5b0;border-radius:2px;}
+::-webkit-scrollbar-thumb{background:#d3cfc2;border-radius:2px;}
 .screen{flex:1;overflow-y:auto;padding-bottom:88px;}
-.card{background:#fff;border-radius:16px;box-shadow:0 1px 8px rgba(80,60,20,0.07);}
+.card{background:#fff;border-radius:16px;box-shadow:0 1px 8px rgba(30,50,40,0.07);}
 .btn{border:none;border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
-.btn-primary{background:#a8470f;color:#fff;padding:11px 20px;font-size:14px;}
-.btn-primary:hover{background:#8a3a0c;}
-.btn-primary:disabled{background:#a09080;cursor:not-allowed;}
-.btn-outline{background:#fff;color:#a8470f;border:1.5px solid #d4c5b0;padding:9px 16px;font-size:13px;}
-.btn-outline:hover{background:#f5ede0;}
-.btn-ghost{background:transparent;color:#8a7050;border:none;padding:6px 10px;font-size:13px;cursor:pointer;}
+.btn-primary{background:#2e5d4e;color:#fff;padding:11px 20px;font-size:14px;}
+.btn-primary:hover{background:#234a3d;}
+.btn-primary:disabled{background:#9aaba2;cursor:not-allowed;}
+.btn-outline{background:#fff;color:#2e5d4e;border:1.5px solid #d3cfc2;padding:9px 16px;font-size:13px;}
+.btn-outline:hover{background:#e9f0ea;}
+.btn-ghost{background:transparent;color:#66776d;border:none;padding:6px 10px;font-size:13px;cursor:pointer;}
 .btn-sm{padding:6px 12px;font-size:12px;border-radius:8px;}
-.btn-icon{background:none;border:none;cursor:pointer;padding:4px 8px;font-size:16px;color:#8a7050;border-radius:6px;}
-.btn-icon:hover{background:#f0e8d8;}
+.btn-icon{background:none;border:none;cursor:pointer;padding:4px 8px;font-size:16px;color:#66776d;border-radius:6px;}
+.btn-icon:hover{background:#ebe7dc;}
 .tag{display:inline-flex;align-items:center;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:0.05em;}
-.tag-主菜{background:#fde8e0;color:#c0391b;}
-.tag-副菜{background:#e0f0e8;color:#1b7a3e;}
+.tag-主菜{background:#fde9df;color:#c4532a;}
+.tag-副菜{background:#e3efe6;color:#2e6b4f;}
 .tag-お弁当{background:#e8e4f8;color:#4a2fa0;}
-input,select,textarea{font-family:inherit;border:1.5px solid #e0d4c0;border-radius:10px;padding:10px 13px;font-size:14px;width:100%;background:#fdfaf6;color:#1a1208;outline:none;transition:border .15s;}
-input:focus,select:focus,textarea:focus{border-color:#a8470f;box-shadow:0 0 0 3px rgba(61,43,8,0.07);}
+input,select,textarea{font-family:inherit;border:1.5px solid #dcd7ca;border-radius:10px;padding:10px 13px;font-size:14px;width:100%;background:#fbf9f4;color:#1f2a24;outline:none;transition:border .15s;}
+input:focus,select:focus,textarea:focus{border-color:#2e5d4e;box-shadow:0 0 0 3px rgba(46,93,78,0.12);}
 input[type=date]{cursor:pointer;}
-.overlay{position:fixed;inset:0;background:rgba(26,18,8,.55);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
-.sheet{background:#fdfaf6;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;padding:24px 20px 40px;animation:slideUp .25s;}
-.detail-sheet{background:#fdfaf6;border-radius:20px 20px 0 0;width:100%;max-width:480px;height:88vh;overflow-y:auto;animation:slideUp .25s;}
+.overlay{position:fixed;inset:0;background:rgba(20,32,26,.55);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
+.sheet{background:#fbf9f4;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;padding:24px 20px 40px;animation:slideUp .25s;}
+.detail-sheet{background:#fbf9f4;border-radius:20px 20px 0 0;width:100%;max-width:480px;height:88vh;overflow-y:auto;animation:slideUp .25s;}
 @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.pill-btn{border:1.5px solid #d4c5b0;border-radius:20px;background:#fff;color:#5a4020;padding:6px 14px;font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s;font-weight:500;}
-.pill-btn.active{background:#a8470f;color:#fff;border-color:#a8470f;}
-.section-head{font-size:11px;font-weight:700;color:#b09070;letter-spacing:.1em;padding:0 4px;margin-bottom:6px;}
-.item-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #f0e8d8;gap:10px;background:#fff;}
+.pill-btn{border:1.5px solid #d3cfc2;border-radius:20px;background:#fff;color:#3d5046;padding:6px 14px;font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s;font-weight:500;}
+.pill-btn.active{background:#2e5d4e;color:#fff;border-color:#2e5d4e;}
+.section-head{font-size:11px;font-weight:700;color:#8f9d94;letter-spacing:.1em;padding:0 4px;margin-bottom:6px;}
+.item-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #ebe7dc;gap:10px;background:#fff;}
 .item-row:last-child{border-bottom:none;}
 .num-ctrl{display:inline-flex;align-items:center;gap:4px;}
-.num-btn{width:28px;height:28px;border:1.5px solid #d4c5b0;border-radius:8px;background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#a8470f;font-weight:700;}
-.num-btn:hover{background:#f5ede0;}
-.check-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f0e8d8;cursor:pointer;}
+.num-btn{width:28px;height:28px;border:1.5px solid #d3cfc2;border-radius:8px;background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#2e5d4e;font-weight:700;}
+.num-btn:hover{background:#e9f0ea;}
+.check-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #ebe7dc;cursor:pointer;}
 .check-row:last-child{border-bottom:none;}
-.custom-check{width:22px;height:22px;border:2px solid #d4c5b0;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
-.custom-check.checked{background:#a8470f;border-color:#a8470f;color:#fff;}
-.fav-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:2px;line-height:1;}
-.history-week{border-radius:12px;overflow:hidden;border:1.5px solid #e8dcc8;}
-.empty-state{text-align:center;padding:60px 20px;color:#b09070;}
-.portion-select{border:1.5px solid #d4c5b0;border-radius:8px;background:#fff;color:#a8470f;padding:5px 8px;font-size:12px;font-family:inherit;cursor:pointer;}
-.toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#a8470f;color:#fff;border-radius:20px;padding:8px 20px;font-size:12px;z-index:400;animation:fadeIn .2s;white-space:nowrap;pointer-events:none;}
+.custom-check{width:22px;height:22px;border:2px solid #d3cfc2;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.custom-check.checked{background:#2e5d4e;border-color:#2e5d4e;color:#fff;}
+.fav-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:2px;line-height:1;color:#ed7342;}
+.history-week{border-radius:12px;overflow:hidden;border:1.5px solid #e2ddd0;}
+.empty-state{text-align:center;padding:60px 20px;color:#8f9d94;}
+.portion-select{width:auto;flex-shrink:0;border:1.5px solid #d3cfc2;border-radius:8px;background:#fff;color:#2e5d4e;padding:5px 8px;font-size:12px;font-family:inherit;cursor:pointer;}
+.toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#2e5d4e;color:#fff;border-radius:20px;padding:8px 20px;font-size:12px;z-index:400;animation:fadeIn .2s;white-space:nowrap;pointer-events:none;}
 .toast.error{background:#c0391b;}
 .toast.warn{background:#8a6000;}
 .error-msg{color:#c0391b;font-size:12px;margin-top:6px;padding:8px 12px;background:#fff0ee;border-radius:8px;}
-.login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f8f5f0;padding:24px;}
-.login-card{background:#fff;border-radius:20px;padding:36px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(61,43,8,0.12);}
-.tab-toggle{display:flex;border-radius:10px;background:#f0e8d8;padding:3px;gap:3px;margin-bottom:24px;}
+.login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f6f2e9;padding:24px;}
+.login-card{background:#fff;border-radius:20px;padding:36px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(30,50,40,0.10);}
+.tab-toggle{display:flex;border-radius:10px;background:#ebe7dc;padding:3px;gap:3px;margin-bottom:24px;}
 .tab-toggle button{flex:1;border:none;border-radius:8px;padding:9px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;}
-.tab-toggle button.active{background:#a8470f;color:#fff;}
-.tab-toggle button:not(.active){background:transparent;color:#8a7050;}
+.tab-toggle button.active{background:#2e5d4e;color:#fff;}
+.tab-toggle button:not(.active){background:transparent;color:#66776d;}
 .step-row{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start;}
-.step-num{width:28px;height:28px;border-radius:50%;background:#a8470f;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
-.step-text{flex:1;line-height:1.7;font-size:14px;color:#2c1e08;}
-.ing-chip{display:inline-flex;align-items:center;background:#faf3e8;border:1px solid #e8d8c0;border-radius:8px;padding:6px 12px;font-size:13px;gap:6px;}
-.ing-amount{font-weight:700;color:#a8470f;}
-.detail-header{background:#a8470f;color:#f8f0e4;padding:16px 20px 20px;}
-.url-btn{display:flex;align-items:center;gap:8px;background:#fff7ed;border:1.5px solid #e8c87a;border-radius:12px;padding:12px 16px;color:#8a6010;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;width:100%;text-decoration:none;}
-.spinner{width:36px;height:36px;border:3px solid #e8dcc8;border-top-color:#a8470f;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
-.date-entry{background:#fff;border-radius:12px;border:1.5px solid #e8dcc8;margin-bottom:8px;overflow:hidden;}
-.date-entry-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fdfaf6;border-bottom:1px solid #f0e8d8;}
+.step-num{width:28px;height:28px;border-radius:50%;background:#2e5d4e;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.step-text{flex:1;line-height:1.7;font-size:14px;color:#26332c;}
+.ing-chip{display:inline-flex;align-items:center;background:#eef3ec;border:1px solid #dfe6dc;border-radius:8px;padding:6px 12px;font-size:13px;gap:6px;}
+.ing-amount{font-weight:700;color:#c4532a;}
+.detail-header{background:#2e5d4e;color:#f6f2e9;padding:16px 20px 20px;}
+.url-btn{display:flex;align-items:center;gap:8px;background:#fdf0e9;border:1.5px solid #f3c3a8;border-radius:12px;padding:12px 16px;color:#b8542a;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;width:100%;text-decoration:none;}
+.spinner{width:36px;height:36px;border:3px solid #e2ddd0;border-top-color:#2e5d4e;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
+.date-entry{background:#fff;border-radius:12px;border:1.5px solid #e2ddd0;margin-bottom:8px;overflow:hidden;}
+.date-entry-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fbf9f4;border-bottom:1px solid #ebe7dc;}
 .bento-section{background:#f0ebfa;border:1.5px solid #c8b8f0;border-radius:12px;margin-bottom:12px;overflow:hidden;}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:4px;}
-.sync-dot.off{background:#e0d4c0;}
+.sync-dot.off{background:#dcd7ca;}
 .sync-dot.poll{background:#e8a000;}
-.recipe-thumb{width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#f5ede0;}
-.recipe-thumb-ph{width:52px;height:52px;border-radius:10px;flex-shrink:0;background:#f5ede0;display:flex;align-items:center;justify-content:center;font-size:22px;color:#c9b090;}
-.detail-photo{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#f5ede0;}
-.photo-box{width:100%;aspect-ratio:4/3;border-radius:12px;border:1.5px dashed #d4c5b0;background:#faf5ee;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#b09070;font-size:12px;overflow:hidden;position:relative;}
+.recipe-thumb{width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#e9f0ea;}
+.recipe-thumb-ph{width:52px;height:52px;border-radius:10px;flex-shrink:0;background:#e9f0ea;display:flex;align-items:center;justify-content:center;font-size:22px;color:#b5c9bd;}
+.detail-photo{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#e9f0ea;}
+.photo-box{width:100%;aspect-ratio:16/9;max-height:200px;border-radius:12px;border:1.5px dashed #d3cfc2;background:#f3f1ea;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#8f9d94;font-size:12px;overflow:hidden;position:relative;}
 .photo-box img{width:100%;height:100%;object-fit:cover;}
-.switch{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#8a7050;cursor:pointer;user-select:none;}
-.switch-track{width:32px;height:18px;border-radius:9px;background:#e0d4c0;position:relative;transition:background .15s;flex-shrink:0;}
+.switch{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#66776d;cursor:pointer;user-select:none;}
+.switch-track{width:32px;height:18px;border-radius:9px;background:#dcd7ca;position:relative;transition:background .15s;flex-shrink:0;}
 .switch-track::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2);}
-.switch-track.on{background:#a8470f;}
+.switch-track.on{background:#2e5d4e;}
 .switch-track.on::after{left:16px;}
 .part-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
-.part-label{flex:1;font-size:11px;color:#a08870;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.part-label{flex:1;font-size:11px;color:#7f8e85;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .num-btn.sm{width:24px;height:24px;font-size:14px;}
 `
 
@@ -390,9 +390,9 @@ function LoginScreen({ onLogin }) {
   return (
     <div className="login-wrap">
       <div style={{ marginBottom: 32, textAlign: "center" }}>
-        <img src="/icon-512.png" alt="CookFlow" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: 8, boxShadow: "0 4px 16px rgba(200,90,20,0.25)" }} />
-        <div style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 26, fontWeight: 700, color: "#a8470f" }}>CookFlow</div>
-        <div style={{ fontSize: 11, color: "#b09070", marginTop: 4, letterSpacing: "0.12em" }}>WEEKLY MENU PLANNER</div>
+        <img src="/icon-512.png" alt="CookFlow" style={{ width: 104, height: 104, borderRadius: 26, marginBottom: 12, boxShadow: "0 6px 24px rgba(46,93,78,0.18)" }} />
+        <div style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 28, fontWeight: 700, color: "#2e5d4e" }}>CookFlow</div>
+        <div style={{ fontSize: 12, color: "#66776d", marginTop: 6 }}>献立から買い物まで、ひとつの流れで</div>
       </div>
       <div className="login-card">
         <div className="tab-toggle">
@@ -400,8 +400,8 @@ function LoginScreen({ onLogin }) {
           <button className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setError("") }}>新規登録</button>
         </div>
         <div style={{ display: "grid", gap: 12 }}>
-          <div><label style={{ fontSize: 11, fontWeight: 700, color: "#8a7050", display: "block", marginBottom: 4 }}>ユーザー名</label><input placeholder="例: hanako" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === "Enter" && handle()} autoCapitalize="none" autoCorrect="off" /></div>
-          <div><label style={{ fontSize: 11, fontWeight: 700, color: "#8a7050", display: "block", marginBottom: 4 }}>パスワード</label><input type="password" placeholder="4文字以上" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handle()} /></div>
+          <div><label style={{ fontSize: 11, fontWeight: 700, color: "#66776d", display: "block", marginBottom: 4 }}>ユーザー名</label><input placeholder="例: hanako" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={e => e.key === "Enter" && handle()} autoCapitalize="none" autoCorrect="off" /></div>
+          <div><label style={{ fontSize: 11, fontWeight: 700, color: "#66776d", display: "block", marginBottom: 4 }}>パスワード</label><input type="password" placeholder="4文字以上" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handle()} /></div>
           {error && <div className="error-msg">⚠️ {error}</div>}
           <button className="btn btn-primary" style={{ width: "100%", padding: "13px", marginTop: 4 }} onClick={handle} disabled={loading}>{loading ? "処理中..." : mode === "login" ? "ログイン" : "アカウントを作成"}</button>
         </div>
@@ -444,34 +444,34 @@ function RecipeDetailSheet({ recipe, onClose, onEdit }) {
       <div className="detail-sheet">
         <div className="detail-header">
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#f8f0e4", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>← 戻る</button>
-            {onEdit && <button onClick={onEdit} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#f8f0e4", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>編集</button>}
+            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#f6f2e9", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>← 戻る</button>
+            {onEdit && <button onClick={onEdit} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#f6f2e9", padding: "6px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>編集</button>}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
             <span className={`tag tag-${recipe.tag}`}>{recipe.tag}</span>
             {recipe.favorite && <span style={{ fontSize: 18 }}>★</span>}
           </div>
-          <h2 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 24, fontWeight: 700, marginBottom: 6 }}>{recipe.name}</h2>
-          {recipe.memo && <p style={{ fontSize: 13, color: "#d4b88a", lineHeight: 1.6 }}>💬 {recipe.memo}</p>}
+          <h2 style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 24, fontWeight: 700, marginBottom: 6 }}>{recipe.name}</h2>
+          {recipe.memo && <p style={{ fontSize: 13, color: "#cfe0d6", lineHeight: 1.6 }}>💬 {recipe.memo}</p>}
         </div>
         {photoUrl && <img src={photoUrl} alt={recipe.name} className="detail-photo" />}
-        {recipe.url && <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0e8d8" }}><a href={recipe.url} target="_blank" rel="noopener noreferrer" className="url-btn"><span style={{ fontSize: 18 }}>▶️</span><span>参考動画・レシピを見る</span><span style={{ marginLeft: "auto", fontSize: 11, color: "#b09070" }}>外部リンク →</span></a></div>}
-        <div style={{ display: "flex", borderBottom: "2px solid #f0e8d8", background: "#fff" }}>
+        {recipe.url && <div style={{ padding: "14px 16px", borderBottom: "1px solid #ebe7dc" }}><a href={recipe.url} target="_blank" rel="noopener noreferrer" className="url-btn"><span style={{ fontSize: 18 }}>▶️</span><span>参考動画・レシピを見る</span><span style={{ marginLeft: "auto", fontSize: 11, color: "#8f9d94" }}>外部リンク →</span></a></div>}
+        <div style={{ display: "flex", borderBottom: "2px solid #ebe7dc", background: "#fff" }}>
           {[{ id: "steps", label: "👨‍🍳 作り方" }, { id: "ingredients", label: "🥬 材料" }].map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, border: "none", background: "none", padding: "13px", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: activeTab === t.id ? "#a8470f" : "#b09070", borderBottom: activeTab === t.id ? "2px solid #a8470f" : "2px solid transparent", marginBottom: -2, transition: "all .15s" }}>{t.label}</button>
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, border: "none", background: "none", padding: "13px", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: activeTab === t.id ? "#2e5d4e" : "#8f9d94", borderBottom: activeTab === t.id ? "2px solid #2e5d4e" : "2px solid transparent", marginBottom: -2, transition: "all .15s" }}>{t.label}</button>
           ))}
         </div>
         {activeTab === "steps" && <div style={{ padding: "20px 16px" }}>
-          {(!recipe.steps || !recipe.steps.length) ? <div style={{ textAlign: "center", padding: "40px 20px", color: "#b09070" }}><div style={{ fontSize: 36, marginBottom: 10 }}>📝</div><div>作り方が登録されていません</div></div>
+          {(!recipe.steps || !recipe.steps.length) ? <div style={{ textAlign: "center", padding: "40px 20px", color: "#8f9d94" }}><div style={{ fontSize: 36, marginBottom: 10 }}>📝</div><div>作り方が登録されていません</div></div>
             : recipe.steps.map((step, i) => <div key={i} className="step-row"><div className="step-num">{i + 1}</div><div className="step-text">{step}</div></div>)}
         </div>}
         {activeTab === "ingredients" && <div style={{ padding: "20px 16px" }}>
-          <div style={{ fontSize: 12, color: "#b09070", marginBottom: 14 }}>基本 {recipe.servings || 2}人前</div>
+          <div style={{ fontSize: 12, color: "#8f9d94", marginBottom: 14 }}>基本 {recipe.servings || 2}人前</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
             {recipe.ingredients.filter(i => i.type === "通常食材").map((ing, i) => <div key={i} className="ing-chip"><span>{ing.name}</span><span className="ing-amount">{ing.amount}{ing.unit}</span></div>)}
           </div>
           {recipe.ingredients.some(i => i.type === "調味料") && <>
-            <div style={{ fontSize: 12, color: "#b09070", marginBottom: 10, fontWeight: 700 }}>調味料</div>
+            <div style={{ fontSize: 12, color: "#8f9d94", marginBottom: 10, fontWeight: 700 }}>調味料</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {recipe.ingredients.filter(i => i.type === "調味料").map((ing, i) => <div key={i} className="ing-chip" style={{ background: "#f5f0fa", borderColor: "#d8cce8" }}><span>{ing.name}</span><span className="ing-amount" style={{ color: "#6a3fa0" }}>{ing.amount}{ing.unit}</span></div>)}
             </div>
@@ -868,10 +868,11 @@ export default function App() {
 
   if (autoLogging) return (
     <><style>{CSS}</style>
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f8f5f0" }}>
-      <img src="/icon-512.png" alt="CookFlow" style={{ width: 64, height: 64, borderRadius: 16, marginBottom: 20, boxShadow: "0 4px 16px rgba(200,90,20,0.2)" }} />
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f6f2e9" }}>
+      <img src="/icon-512.png" alt="CookFlow" style={{ width: 96, height: 96, borderRadius: 24, marginBottom: 14, boxShadow: "0 6px 24px rgba(46,93,78,0.18)" }} />
+      <div style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 22, fontWeight: 700, color: "#2e5d4e", marginBottom: 22 }}>CookFlow</div>
       <div className="spinner" />
-      <div style={{ fontSize: 13, color: "#b09070" }}>データを読み込んでいます...</div>
+      <div style={{ fontSize: 13, color: "#8f9d94" }}>データを読み込んでいます...</div>
     </div></>
   )
 
@@ -886,20 +887,20 @@ export default function App() {
   ]
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f5f0", fontFamily: "'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN',sans-serif", color: "#1a1208", display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div style={{ minHeight: "100vh", background: "#f6f2e9", fontFamily: "'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN',sans-serif", color: "#1f2a24", display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", position: "relative" }}>
       <style>{CSS}</style>
       {toast && <div className={`toast ${toast.type === "error" ? "error" : toast.type === "warn" ? "warn" : ""}`}>{toast.msg}</div>}
 
-      <header style={{ background: "#a8470f", color: "#f8f0e4", padding: "13px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, position: "sticky", top: 0, zIndex: 50 }}>
+      <header style={{ background: "#2e5d4e", color: "#f6f2e9", padding: "13px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, position: "sticky", top: 0, zIndex: 50 }}>
         <img src="/icon-512.png" alt="CookFlow" style={{ width: 32, height: 32, borderRadius: 8 }} />
         <div>
-          <div style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 17, fontWeight: 700, letterSpacing: "0.1em" }}>CookFlow</div>
-          <div style={{ fontSize: 9, color: "#c9b090", letterSpacing: "0.15em" }}>WEEKLY MENU PLANNER</div>
+          <div style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>CookFlow</div>
+          <div style={{ fontSize: 8, color: "#b5c9bd", letterSpacing: "0.1em", whiteSpace: "nowrap" }}>WEEKLY MENU PLANNER</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, color: "#c9b090" }}>👤 {userId}</span>
-          {screen === "catalog" && <button className="btn btn-outline btn-sm" style={{ background: "transparent", color: "#f8f0e4", borderColor: "#6a5030" }} onClick={() => { setEditRecipe(null); setShowRegister(true) }}>＋ 追加</button>}
-          <button className="btn btn-ghost btn-sm" style={{ color: "#c9b090", fontSize: 11 }} onClick={logout}>ログアウト</button>
+          <span style={{ fontSize: 11, color: "#b5c9bd", whiteSpace: "nowrap", maxWidth: 72, overflow: "hidden", textOverflow: "ellipsis" }}>👤 {userId}</span>
+          {screen === "catalog" && <button className="btn btn-outline btn-sm" style={{ background: "transparent", color: "#f6f2e9", borderColor: "rgba(246,242,233,0.4)", whiteSpace: "nowrap" }} onClick={() => { setEditRecipe(null); setShowRegister(true) }}>＋ 追加</button>}
+          <button className="btn btn-ghost btn-sm" style={{ color: "#b5c9bd", fontSize: 11, whiteSpace: "nowrap", padding: "6px 4px" }} onClick={logout}>ログアウト</button>
         </div>
       </header>
 
@@ -917,7 +918,7 @@ export default function App() {
               if (!filtered.length) return <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>🍽️</div><div style={{ fontWeight: 600, marginBottom: 6 }}>レシピがありません</div><div style={{ fontSize: 12 }}>右上の「＋追加」から登録してね</div></div>
               return <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {filtered.map(r => (
-                  <div key={r.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 6px rgba(80,60,20,0.06)", overflow: "hidden" }}>
+                  <div key={r.id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 6px rgba(30,50,40,0.06)", overflow: "hidden" }}>
                     <div style={{ padding: "13px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setDetailRecipe(r)}>
                       <button className="fav-btn" onClick={e => { e.stopPropagation(); toggleFavorite(r.id) }}>{r.favorite ? "★" : "☆"}</button>
                       {r.photoPath
@@ -928,13 +929,13 @@ export default function App() {
                           <span style={{ fontWeight: 700, fontSize: 15 }}>{r.name}</span>
                           <span className={`tag tag-${r.tag}`}>{r.tag}</span>
                         </div>
-                        {r.memo && <div style={{ fontSize: 11, color: "#a08870", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.memo}</div>}
+                        {r.memo && <div style={{ fontSize: 11, color: "#7f8e85", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.memo}</div>}
                       </div>
-                      <span style={{ color: "#c9b090", fontSize: 20 }}>›</span>
+                      <span style={{ color: "#b5c9bd", fontSize: 20 }}>›</span>
                     </div>
-                    <div style={{ display: "flex", borderTop: "1px solid #f5ede0", background: "#fdfaf6" }}>
+                    <div style={{ display: "flex", borderTop: "1px solid #e9f0ea", background: "#fbf9f4" }}>
                       <button className="btn btn-ghost btn-sm" style={{ flex: 1, padding: "8px", borderRadius: 0, fontSize: 12 }} onClick={() => { setEditRecipe(r); setShowRegister(true) }}>✏️ 編集</button>
-                      <div style={{ width: 1, background: "#f0e8d8" }} />
+                      <div style={{ width: 1, background: "#ebe7dc" }} />
                       <button className="btn btn-ghost btn-sm" style={{ flex: 1, padding: "8px", borderRadius: 0, fontSize: 12, color: "#c0391b" }} onClick={() => deleteRecipe(r.id)}>🗑 削除</button>
                     </div>
                   </div>
@@ -950,7 +951,7 @@ export default function App() {
 
             {history.length > 0 && (
               <button className="btn btn-outline" style={{ width: "100%", marginBottom: 12 }} onClick={() => copyFromHistory(history[0])}>
-                📋 前回の献立をコピー<span style={{ fontSize: 11, color: "#b09070", fontWeight: 400 }}>（{history[0].label}）</span>
+                📋 前回の献立をコピー<span style={{ fontSize: 11, color: "#8f9d94", fontWeight: 400 }}>（{history[0].label}）</span>
               </button>
             )}
 
@@ -996,10 +997,10 @@ export default function App() {
 
             {/* 通常献立 */}
             <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: "#a8470f" }}>🍽️ 夕食・その他の献立</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#2e5d4e" }}>🍽️ 夕食・その他の献立</div>
               <button className="btn btn-outline btn-sm" onClick={addPlanEntry}>＋ 日を追加</button>
             </div>
-            {sortedEntries.length === 0 && <div style={{ textAlign: "center", padding: "20px", color: "#b09070", fontSize: 13 }}>「＋ 日を追加」から始めよう</div>}
+            {sortedEntries.length === 0 && <div style={{ textAlign: "center", padding: "20px", color: "#8f9d94", fontSize: 13 }}>「＋ 日を追加」から始めよう</div>}
             {(() => {
               // 日付でグループ化（同じ日付のエントリをまとめる）
               const groups = []
@@ -1027,17 +1028,17 @@ export default function App() {
                           const next = planEntries.map(pe => group.entries.find(g => g.entry.id === pe.id) ? { ...pe, date: newDate } : pe)
                           setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
                         }}
-                        style={{ width: 148, fontSize: 13, padding: "6px 8px", flex: "0 0 auto" }} />
-                      <div style={{ fontSize: 12, color: "#8a7050", minWidth: 76 }}>{group.date ? formatDateLabel(group.date) : "日付未設定"}</div>
+                        style={{ width: 128, fontSize: 12, padding: "6px 6px", flex: "0 0 auto" }} />
+                      <div style={{ fontSize: 12, color: "#66776d", whiteSpace: "nowrap", minWidth: 0 }}>{group.date ? formatDateLabel(group.date) : "日付未設定"}</div>
                       {/* スキップ：グループの最初のエントリで代表 */}
                       <button onClick={() => {
                         const isSkipped = group.entries[0].entry.skip
                         const next = planEntries.map(pe => group.entries.find(g => g.entry.id === pe.id) ? { ...pe, skip: !isSkipped } : pe)
                         setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
-                      }} style={{ marginLeft: "auto", background: group.entries[0].entry.skip ? "#f0e8d8" : "none", border: "1.5px solid #d4c5b0", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: group.entries[0].entry.skip ? "#8a7050" : "#c0a880", fontWeight: 600 }}>
+                      }} style={{ marginLeft: "auto", background: group.entries[0].entry.skip ? "#ebe7dc" : "none", border: "1.5px solid #d3cfc2", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: group.entries[0].entry.skip ? "#66776d" : "#a9b4ad", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
                         {group.entries[0].entry.skip ? "スキップ中" : "スキップ"}
                       </button>
-                      <button className="btn-icon" style={{ color: "#c0391b" }} onClick={() => {
+                      <button className="btn-icon" style={{ color: "#c0391b", flexShrink: 0, padding: "4px 4px" }} onClick={() => {
                         // グループ内の全エントリを削除
                         const ids = group.entries.map(g => g.entry.id)
                         const next = planEntries.filter(pe => !ids.includes(pe.id))
@@ -1046,14 +1047,14 @@ export default function App() {
                     </div>
 
                     {group.entries[0].entry.skip
-                      ? <div style={{ padding: "10px 14px", fontSize: 13, color: "#c0a880" }}>外食・お休みの日</div>
+                      ? <div style={{ padding: "10px 14px", fontSize: 13, color: "#a9b4ad" }}>外食・お休みの日</div>
                       : <>
                           {/* グループ内の各メニュー */}
                           {group.entries.map(({ entry }, mIdx) => (
-                            <div key={entry.id} style={{ padding: "10px 14px", borderTop: mIdx > 0 ? "1px dashed #e8dcc8" : "none", display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div key={entry.id} style={{ padding: "10px 14px", borderTop: mIdx > 0 ? "1px dashed #e2ddd0" : "none", display: "flex", flexDirection: "column", gap: 8 }}>
                               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                                 {group.entries.length > 1 && (
-                                  <span style={{ fontSize: 11, color: "#a8470f", fontWeight: 700, minWidth: 20 }}>{mIdx + 1}.</span>
+                                  <span style={{ fontSize: 11, color: "#2e5d4e", fontWeight: 700, minWidth: 20 }}>{mIdx + 1}.</span>
                                 )}
                                 <select value={entry.recipeId || ""} onChange={e => updateEntry(entry.id, { recipeId: e.target.value ? Number(e.target.value) : null })} style={{ flex: 1, fontSize: 13, padding: "7px 10px" }}>
                                   <option value="">── レシピを選択 ──</option>
@@ -1074,14 +1075,14 @@ export default function App() {
                                     <option value={3}>3日分（6人前）</option>
                                     <option value={4}>4日分（8人前）</option>
                                   </select>
-                                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }} onClick={() => setDetailRecipe(recipes.find(r => r.id === entry.recipeId))}>レシピ確認 →</button>
+                                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 12, whiteSpace: "nowrap" }} onClick={() => setDetailRecipe(recipes.find(r => r.id === entry.recipeId))}>レシピ確認 →</button>
                                 </div>
                               )}
                             </div>
                           ))}
                           {/* この日にメニューを追加するボタン */}
-                          <div style={{ padding: "8px 14px", borderTop: "1px dashed #e8dcc8" }}>
-                            <button className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: "#a8470f" }} onClick={() => {
+                          <div style={{ padding: "8px 14px", borderTop: "1px dashed #e2ddd0" }}>
+                            <button className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: "#2e5d4e" }} onClick={() => {
                               const newEntry = { id: Date.now(), date: group.date, recipeId: null, portion: 1, skip: false }
                               const next = [...planEntries, newEntry]
                               setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
@@ -1106,15 +1107,15 @@ export default function App() {
         {/* ── 調味料チェック ── */}
         {screen === "seasoning" && (
           <div style={{ padding: "16px 16px 0" }}>
-            <div style={{ marginBottom: 14, fontSize: 13, color: "#8a7050" }}>今回使う調味料です。<br />家にない・買い足したいものにチェックを ✓</div>
+            <div style={{ marginBottom: 14, fontSize: 13, color: "#66776d" }}>今回使う調味料です。<br />家にない・買い足したいものにチェックを ✓</div>
             <div className="card" style={{ overflow: "hidden", marginBottom: 16 }}>
-              {!allSeasonings.length && <div style={{ padding: "20px", color: "#c0a880", fontSize: 13, textAlign: "center" }}>献立タブでメニューを設定してください</div>}
+              {!allSeasonings.length && <div style={{ padding: "20px", color: "#a9b4ad", fontSize: 13, textAlign: "center" }}>献立タブでメニューを設定してください</div>}
               {allSeasonings.map(s => (
                 <div key={s.name} className="check-row" onClick={() => toggleSeasoningCheck(s.name)}>
                   <div className={`custom-check ${seasoningChecks[s.name] ? "checked" : ""}`}>{seasoningChecks[s.name] ? "✓" : ""}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>合計 <strong>{Math.round(s.totalAmount * 10) / 10}{s.unit}</strong>　{s.recipes.join("・")}</div>
+                    <div style={{ fontSize: 11, color: "#7f8e85", marginTop: 2 }}>合計 <strong>{Math.round(s.totalAmount * 10) / 10}{s.unit}</strong>　{s.recipes.join("・")}</div>
                   </div>
                   {seasoningChecks[s.name] && <span style={{ fontSize: 11, color: "#c0391b", fontWeight: 700, flexShrink: 0 }}>リストへ追加</span>}
                 </div>
@@ -1137,7 +1138,7 @@ export default function App() {
               <>
                 {/* 同期インジケーター */}
                 <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 11, color: "#8a7050", display: "flex", alignItems: "center" }}>
+                  <div style={{ fontSize: 11, color: "#66776d", display: "flex", alignItems: "center" }}>
                     <span className={`sync-dot ${syncStatus === "live" ? "" : syncStatus === "polling" ? "poll" : "off"}`} />{syncStatus === "live" ? "リアルタイム同期中" : syncStatus === "polling" ? "30秒ごとに同期中" : "接続中..."}
                   </div>
                   {(planEntries.some(e => !e.skip && e.recipeId) || bentoEntries.some(e => e.recipeId)) && (
@@ -1172,17 +1173,17 @@ export default function App() {
                         {(moveChecked ? [...unchecked, ...checked] : allItems).map(item => {
                           const isChecked = checkedItems.includes(item.name)
                           return (
-                            <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f8f5f0" : "#fff" }}>
-                              <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#a8470f" : "#d4c5b0"}`, background: isChecked ? "#a8470f" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
+                            <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f6f2e9" : "#fff" }}>
+                              <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#2e5d4e" : "#d3cfc2"}`, background: isChecked ? "#2e5d4e" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
                                 {isChecked ? "✓" : ""}
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
-                                {item.isSeasoning && <span style={{ fontSize: 10, color: "#a08870" }}>調味料（買い足し）</span>}
-                                {item.isManual && <span style={{ fontSize: 10, color: "#7a9fc0" }}>手動追加</span>}
+                                {item.isSeasoning && <span style={{ fontSize: 10, color: "#7f8e85" }}>調味料（買い足し）</span>}
+                                {item.isManual && <span style={{ fontSize: 10, color: "#5a8aa0" }}>手動追加</span>}
                                 {/* 単位が異なる同名食材：内訳ごとに数量調整 */}
                                 {item.mixed && <>
-                                  <div style={{ fontSize: 12, fontWeight: 700, color: "#a8470f", marginTop: 2 }}>{item.parts.map(p => `${p.displayAmount}${p.unit}`).join(" ＋ ")}</div>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: "#2e5d4e", marginTop: 2 }}>{item.parts.map(p => `${p.displayAmount}${p.unit}`).join(" ＋ ")}</div>
                                   {item.parts.map(p => (
                                     <div key={p.unit} className="part-row">
                                       <span className="part-label">└ {p.recipes.join("・")}</span>
@@ -1201,7 +1202,7 @@ export default function App() {
                                     <span style={{ minWidth: 60, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
                                     <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit, item.amount)}>＋</button>
                                   </div>
-                                : <span style={{ fontSize: 13, color: "#8a7050" }}>{item.amount}{item.unit}</span>}
+                                : <span style={{ fontSize: 13, color: "#66776d" }}>{item.amount}{item.unit}</span>}
                               <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => item.isManual ? removeManualItem(item.name) : removeShoppingItem(item.name)}>✕</button>
                             </div>
                           )
@@ -1210,20 +1211,20 @@ export default function App() {
                     </div>
                   )
                 })}
-                {checkedItems.length > 0 && <div style={{ textAlign: "center", padding: "8px", fontSize: 12, color: "#8a7050" }}>{checkedItems.length}品チェック済み</div>}
+                {checkedItems.length > 0 && <div style={{ textAlign: "center", padding: "8px", fontSize: 12, color: "#66776d" }}>{checkedItems.length}品チェック済み</div>}
               </>
             ) : (
               <>
                 {/* ドラッグストア用リスト */}
                 <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 11, color: "#8a7050", display: "flex", alignItems: "center" }}><span className={`sync-dot ${syncStatus === "live" ? "" : syncStatus === "polling" ? "poll" : "off"}`} />{syncStatus === "live" ? "リアルタイム同期中" : syncStatus === "polling" ? "30秒ごとに同期中" : "接続中..."}</span>
+                  <span style={{ fontSize: 11, color: "#66776d", display: "flex", alignItems: "center" }}><span className={`sync-dot ${syncStatus === "live" ? "" : syncStatus === "polling" ? "poll" : "off"}`} />{syncStatus === "live" ? "リアルタイム同期中" : syncStatus === "polling" ? "30秒ごとに同期中" : "接続中..."}</span>
                 </div>
-                <div style={{ background: "#fff0e0", border: "1.5px solid #f0c890", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#8a5a10" }}>
+                <div style={{ background: "#fdf0e9", border: "1.5px solid #f3c3a8", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#a64a22" }}>
                   💊 ウェル活・ドラッグストアの買い物はここで管理。スーパーのリストとは別に独立しています。
                 </div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                   <input placeholder="＋ アイテムを追加（例：シャンプー）" value={addManualInput} onChange={e => setAddManualInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addDrugItem()} style={{ flex: 1, fontSize: 13, padding: "9px 12px" }} />
-                  <button className="btn btn-primary btn-sm" onClick={addDrugItem} style={{ whiteSpace: "nowrap", background: "#c05a1b" }}>追加</button>
+                  <button className="btn btn-primary btn-sm" onClick={addDrugItem} style={{ whiteSpace: "nowrap", background: "#d9602c" }}>追加</button>
                 </div>
                 {drugItems.length > 0 && <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
                   <label className="switch" onClick={() => { const v = !moveChecked; setMoveChecked(v); saveMoveChecked(v) }}>
@@ -1236,8 +1237,8 @@ export default function App() {
                     {(moveChecked ? [...drugItems.filter(i => !checkedItems.includes(i.name)), ...drugItems.filter(i => checkedItems.includes(i.name))] : drugItems).map(item => {
                       const isChecked = checkedItems.includes(item.name)
                       return (
-                        <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f8f5f0" : "#fff" }}>
-                          <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#c05a1b" : "#d4c5b0"}`, background: isChecked ? "#c05a1b" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
+                        <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f6f2e9" : "#fff" }}>
+                          <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#d9602c" : "#d3cfc2"}`, background: isChecked ? "#d9602c" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
                             {isChecked ? "✓" : ""}
                           </div>
                           <div style={{ flex: 1, fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
@@ -1258,35 +1259,35 @@ export default function App() {
             {!history.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>📖</div><div>まだ履歴がありません</div></div>}
             {history.map(week => (
               <div key={week.id} className="history-week" style={{ marginBottom: 14, background: "#fff" }}>
-                <div style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: expandedHistory === week.id ? "#faf3e8" : "#fff" }}
+                <div style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: expandedHistory === week.id ? "#eef3ec" : "#fff" }}
                   onClick={() => setExpandedHistory(expandedHistory === week.id ? null : week.id)}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>{week.label}</div>
-                    <div style={{ fontSize: 11, color: "#a08870", marginTop: 2 }}>{week.menus.length}日分</div>
+                    <div style={{ fontSize: 11, color: "#7f8e85", marginTop: 2 }}>{week.menus.length}日分</div>
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={e => { e.stopPropagation(); setEditingHistory(week) }}>✏️</button>
                     <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: "#c0391b" }} onClick={e => { e.stopPropagation(); deleteHistory(week.id) }}>🗑</button>
-                    <span style={{ color: "#8a7050" }}>{expandedHistory === week.id ? "▲" : "▼"}</span>
+                    <span style={{ color: "#66776d" }}>{expandedHistory === week.id ? "▲" : "▼"}</span>
                   </div>
                 </div>
                 {expandedHistory === week.id && (
-                  <div style={{ borderTop: "1px solid #f0e8d8" }}>
+                  <div style={{ borderTop: "1px solid #ebe7dc" }}>
                     {week.menus.map((m, i) => (
                       <div key={i} className="item-row">
                         {m.isBento
                           ? <span style={{ fontSize: 11, color: "#4a2fa0", minWidth: 80 }}>🍱 お弁当</span>
-                          : <span style={{ fontSize: 12, color: "#8a7050", minWidth: 80 }}>{m.date ? formatDateLabel(m.date) : `${i+1}日目`}</span>}
-                        <span style={{ flex: 1, fontSize: 14, color: m.skip ? "#c0a880" : "#1a1208" }}>{m.name}</span>
+                          : <span style={{ fontSize: 12, color: "#66776d", minWidth: 80 }}>{m.date ? formatDateLabel(m.date) : `${i+1}日目`}</span>}
+                        <span style={{ flex: 1, fontSize: 14, color: m.skip ? "#a9b4ad" : "#1f2a24" }}>{m.name}</span>
                         {/* レシピ詳細を見るボタン */}
                         {!m.skip && (() => {
                           const r = (m.recipeId && recipes.find(r => r.id === m.recipeId)) || recipes.find(r => r.name === m.name)
-                          return r ? <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: "#7a9fc0" }} onClick={() => setDetailRecipe(r)}>詳細</button> : null
+                          return r ? <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: "#5a8aa0" }} onClick={() => setDetailRecipe(r)}>詳細</button> : null
                         })()}
-                        {!m.skip && <span style={{ fontSize: 11, color: "#a08870" }}>{m.portion === 1 ? "1日分" : `${m.portion}日分`}</span>}
+                        {!m.skip && <span style={{ fontSize: 11, color: "#7f8e85" }}>{m.portion === 1 ? "1日分" : `${m.portion}日分`}</span>}
                       </div>
                     ))}
-                    <div style={{ padding: "12px 16px", borderTop: "1px solid #f0e8d8", background: "#fdfaf6" }}>
+                    <div style={{ padding: "12px 16px", borderTop: "1px solid #ebe7dc", background: "#fbf9f4" }}>
                       <button className="btn btn-outline" style={{ width: "100%" }} onClick={() => copyFromHistory(week)}>🔁 この週の献立を再利用</button>
                     </div>
                   </div>
@@ -1297,12 +1298,12 @@ export default function App() {
         )}
       </div>
 
-      <nav style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#fff", borderTop: "1px solid #e8dcc8", display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <nav style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#fff", borderTop: "1px solid #e2ddd0", display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
         {navItems.map(n => (
-          <button key={n.id} onClick={() => setScreen(n.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, fontFamily: "inherit", color: screen === n.id ? "#a8470f" : "#b09070", transition: "color .15s" }}>
+          <button key={n.id} onClick={() => setScreen(n.id)} style={{ flex: 1, border: "none", background: "none", cursor: "pointer", padding: "10px 4px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, fontFamily: "inherit", color: screen === n.id ? "#2e5d4e" : "#8f9d94", transition: "color .15s" }}>
             <span style={{ fontSize: 20 }}>{n.icon}</span>
             <span style={{ fontSize: 10, fontWeight: screen === n.id ? 700 : 400 }}>{n.label}</span>
-            {screen === n.id && <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#a8470f" }} />}
+            {screen === n.id && <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#2e5d4e" }} />}
           </button>
         ))}
       </nav>
@@ -1319,13 +1320,13 @@ export default function App() {
           <div className="sheet" style={{ maxWidth: 420 }}>
             <div style={{ textAlign: "center", marginBottom: 18 }}>
               <div style={{ fontSize: 44, marginBottom: 12 }}>📋</div>
-              <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 20, fontWeight: 700, marginBottom: 10 }}>コピーしました</h3>
-              <p style={{ fontSize: 13, color: "#8a7050", lineHeight: 1.7 }}>日付を確認してください。<br />曜日はそのままで、今日以降の日付にずらしています。</p>
+              <h3 style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 10 }}>コピーしました</h3>
+              <p style={{ fontSize: 13, color: "#66776d", lineHeight: 1.7 }}>日付を確認してください。<br />曜日はそのままで、今日以降の日付にずらしています。</p>
             </div>
-            <div style={{ background: "#faf3e8", borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, lineHeight: 1.8 }}>
-              <div><span style={{ color: "#8a7050" }}>コピー元：</span>{copyResult.source}</div>
-              <div><span style={{ color: "#8a7050" }}>新しい期間：</span><strong style={{ color: "#a8470f" }}>{copyResult.period}</strong></div>
-              <div style={{ color: "#8a7050" }}>献立 {copyResult.planCount}件 ／ お弁当 {copyResult.bentoCount}件</div>
+            <div style={{ background: "#eef3ec", borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, lineHeight: 1.8 }}>
+              <div><span style={{ color: "#66776d" }}>コピー元：</span>{copyResult.source}</div>
+              <div><span style={{ color: "#66776d" }}>新しい期間：</span><strong style={{ color: "#2e5d4e" }}>{copyResult.period}</strong></div>
+              <div style={{ color: "#66776d" }}>献立 {copyResult.planCount}件 ／ お弁当 {copyResult.bentoCount}件</div>
               {copyResult.missing.length > 0 && <div className="error-msg" style={{ marginTop: 8 }}>⚠️ 見つからないレシピは未設定にしました：{copyResult.missing.join("・")}</div>}
             </div>
             <button className="btn btn-primary" style={{ width: "100%", padding: "13px" }} onClick={() => setCopyResult(null)}>日付を確認する</button>
@@ -1338,14 +1339,14 @@ export default function App() {
           <div className="sheet" style={{ maxWidth: 420 }}>
             <div style={{ textAlign: "center", marginBottom: 20 }}>
               <div style={{ fontSize: 44, marginBottom: 12 }}>🗓</div>
-              <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 20, fontWeight: 700, marginBottom: 10 }}>今回の買い物を締めますか？</h3>
-              <p style={{ fontSize: 13, color: "#8a7050", lineHeight: 1.7 }}>献立を履歴に保存して、買い物リストをリセットします。<br /><span style={{ color: "#c0391b", fontWeight: 600 }}>※この操作は取り消せません</span></p>
+              <h3 style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 10 }}>今回の買い物を締めますか？</h3>
+              <p style={{ fontSize: 13, color: "#66776d", lineHeight: 1.7 }}>献立を履歴に保存して、買い物リストをリセットします。<br /><span style={{ color: "#c0391b", fontWeight: 600 }}>※この操作は取り消せません</span></p>
             </div>
-            <div style={{ background: "#faf3e8", borderRadius: 12, padding: "12px 16px", marginBottom: 20 }}>
-              <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 6, fontWeight: 700 }}>保存される献立</div>
+            <div style={{ background: "#eef3ec", borderRadius: 12, padding: "12px 16px", marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: "#66776d", marginBottom: 6, fontWeight: 700 }}>保存される献立</div>
               {sortedEntries.filter(e => !e.skip && e.recipeId).slice(0, 4).map((e, i) => {
                 const r = recipes.find(r => r.id === e.recipeId)
-                return <div key={i} style={{ fontSize: 13, color: "#a8470f", marginBottom: 2 }}>・{e.date ? formatDateLabel(e.date) : ""} {r?.name}</div>
+                return <div key={i} style={{ fontSize: 13, color: "#2e5d4e", marginBottom: 2 }}>・{e.date ? formatDateLabel(e.date) : ""} {r?.name}</div>
               })}
               {bentoEntries.filter(e => e.recipeId).slice(0, 2).map((e, i) => {
                 const r = recipes.find(r => r.id === e.recipeId)
@@ -1371,13 +1372,13 @@ function HistoryEditSheet({ historyItem, recipes, onSave, onClose }) {
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="sheet">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 18, fontWeight: 700 }}>履歴を編集</h3>
+          <h3 style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 18, fontWeight: 700 }}>履歴を編集</h3>
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
         </div>
-        <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 14 }}>{historyItem.label}</div>
+        <div style={{ fontSize: 12, color: "#66776d", marginBottom: 14 }}>{historyItem.label}</div>
         {menus.map((m, i) => (
-          <div key={i} style={{ background: "#faf5ee", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: "#8a7050", marginBottom: 6 }}>{m.isBento ? "🍱 お弁当" : m.date ? formatDateLabel(m.date) : `${i+1}日目`}</div>
+          <div key={i} style={{ background: "#f3f1ea", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: "#66776d", marginBottom: 6 }}>{m.isBento ? "🍱 お弁当" : m.date ? formatDateLabel(m.date) : `${i+1}日目`}</div>
             {!m.skip
               ? <select value={recipes.find(r => r.name === m.name)?.id || ""} onChange={e => {
                   const r = recipes.find(r => r.id === Number(e.target.value))
@@ -1386,7 +1387,7 @@ function HistoryEditSheet({ historyItem, recipes, onSave, onClose }) {
                   <option value="">── 選択 ──</option>
                   {recipes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
-              : <div style={{ fontSize: 13, color: "#c0a880" }}>外食・スキップ</div>}
+              : <div style={{ fontSize: 13, color: "#a9b4ad" }}>外食・スキップ</div>}
           </div>
         ))}
         <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
@@ -1498,24 +1499,24 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
     }
     setImporting(false)
   }
-  const tabStyle = id => ({ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: regTab === id ? "#a8470f" : "#b09070", borderBottom: regTab === id ? "2px solid #a8470f" : "2px solid transparent", transition: "all .15s" })
+  const tabStyle = id => ({ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: regTab === id ? "#2e5d4e" : "#8f9d94", borderBottom: regTab === id ? "2px solid #2e5d4e" : "2px solid transparent", transition: "all .15s" })
   return (
     <div className="overlay" onClick={e => { if (e.target === e.currentTarget) handleClose() }}>
       <div className="sheet">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h3 style={{ fontFamily: "'Zen Old Mincho',serif", fontSize: 18, fontWeight: 700 }}>{recipe ? "レシピを編集" : "レシピを追加"}</h3>
+          <h3 style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 18, fontWeight: 700 }}>{recipe ? "レシピを編集" : "レシピを追加"}</h3>
           <button className="btn btn-ghost" onClick={handleClose}>✕</button>
         </div>
-        <div style={{ display: "flex", borderBottom: "1px solid #f0e8d8", marginBottom: 18 }}>
+        <div style={{ display: "flex", borderBottom: "1px solid #ebe7dc", marginBottom: 18 }}>
           <button style={tabStyle("basic")} onClick={() => setRegTab("basic")}>基本情報</button>
           <button style={tabStyle("steps")} onClick={() => setRegTab("steps")}>作り方</button>
           <button style={tabStyle("ingredients")} onClick={() => setRegTab("ingredients")}>材料</button>
         </div>
         {regTab === "basic" && (
           <div style={{ display: "grid", gap: 14 }}>
-            <div style={{ background: "#fff7ed", border: "1.5px solid #e8c87a", borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ background: "#fdf0e9", border: "1.5px solid #f3c3a8", borderRadius: 12, padding: "12px 14px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
-                <label style={{ fontSize: 11, color: "#8a6010", fontWeight: 700 }}>🔗 レシピを取り込む</label>
+                <label style={{ fontSize: 11, color: "#b8542a", fontWeight: 700 }}>🔗 レシピを取り込む</label>
                 <div style={{ display: "flex", gap: 4 }}>
                   {[{ id: "url", label: "URL" }, { id: "text", label: "文章から" }].map(m => (
                     <button key={m.id} className={`pill-btn ${importMode === m.id ? "active" : ""}`} style={{ padding: "3px 10px", fontSize: 11 }} onClick={() => { setImportMode(m.id); setImportMsg(null) }} disabled={importing}>{m.label}</button>
@@ -1533,21 +1534,21 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
                   <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importText.trim()} style={{ width: "100%", marginTop: 8 }}>{importing ? "AIで読み取り中..." : "AIで取り込む"}</button>
                 </>
               )}
-              {importing && importMode === "url" && <div style={{ fontSize: 11, color: "#8a6010", marginTop: 6 }}>動画の場合は数十秒かかることがあります</div>}
+              {importing && importMode === "url" && <div style={{ fontSize: 11, color: "#b8542a", marginTop: 6 }}>動画の場合は数十秒かかることがあります</div>}
               {importMsg && (importMsg.type === "error"
                 ? <div className="error-msg">⚠️ {importMsg.text}</div>
-                : <div style={{ fontSize: 12, color: importMsg.type === "warn" ? "#8a6000" : "#1b7a3e", background: importMsg.type === "warn" ? "#fff3d6" : "transparent", borderRadius: 8, padding: importMsg.type === "warn" ? "8px 10px" : 0, marginTop: 6, lineHeight: 1.6 }}>
+                : <div style={{ fontSize: 12, color: importMsg.type === "warn" ? "#8a6000" : "#2e6b4f", background: importMsg.type === "warn" ? "#fff3d6" : "transparent", borderRadius: 8, padding: importMsg.type === "warn" ? "8px 10px" : 0, marginTop: 6, lineHeight: 1.6 }}>
                     {importMsg.type === "warn" ? "⚠️ " : ""}{importMsg.text}
                     {importMsg.type === "warn" && <button className="btn btn-outline btn-sm" style={{ display: "flex", marginTop: 6, fontSize: 11 }} onClick={() => { setImportMode("text"); setImportMsg(null) }}>「文章から」に切り替える</button>}
                   </div>)}
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>写真</label>
+              <label style={{ fontSize: 11, color: "#66776d", display: "block", marginBottom: 4, fontWeight: 700 }}>写真</label>
               <div className="photo-box" onClick={() => !uploading && fileInput.current?.click()} style={{ cursor: uploading ? "wait" : "pointer" }}>
                 {photoUrl
                   ? <img src={photoUrl} alt="レシピ写真" />
                   : <><span style={{ fontSize: 30 }}>📷</span><span>タップして写真を追加</span></>}
-                {uploading && <div style={{ position: "absolute", inset: 0, background: "rgba(253,250,246,.8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}><div className="spinner" style={{ marginBottom: 8 }} /><span>アップロード中...</span></div>}
+                {uploading && <div style={{ position: "absolute", inset: 0, background: "rgba(251,249,244,.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}><div className="spinner" style={{ marginBottom: 8 }} /><span>アップロード中...</span></div>}
               </div>
               <input ref={fileInput} type="file" accept="image/*" onChange={pickPhoto} style={{ display: "none" }} />
               {form.photoPath && !uploading && (
@@ -1559,25 +1560,25 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
               {photoError && <div className="error-msg">⚠️ {photoError}</div>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "flex-end" }}>
-              <div><label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>レシピ名 *</label><input placeholder="例: 肉じゃが" value={form.name} onChange={e => set("name", e.target.value)} /></div>
-              <button onClick={() => set("favorite", !form.favorite)} style={{ background: "none", border: "1.5px solid #d4c5b0", borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontSize: 22 }}>{form.favorite ? "★" : "☆"}</button>
+              <div><label style={{ fontSize: 11, color: "#66776d", display: "block", marginBottom: 4, fontWeight: 700 }}>レシピ名 *</label><input placeholder="例: 肉じゃが" value={form.name} onChange={e => set("name", e.target.value)} /></div>
+              <button onClick={() => set("favorite", !form.favorite)} style={{ background: "none", border: "1.5px solid #d3cfc2", borderRadius: 10, padding: "10px 14px", cursor: "pointer", fontSize: 22 }}>{form.favorite ? "★" : "☆"}</button>
             </div>
-            <div><label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>分類タグ</label><div style={{ display: "flex", gap: 8 }}>{TAGS.map(t => <button key={t} className={`pill-btn ${form.tag === t ? "active" : ""}`} onClick={() => set("tag", t)}>{t}</button>)}</div></div>
-            <div><label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>メモ・コツ</label><textarea rows={2} placeholder="調理のコツや気づきなど..." value={form.memo} onChange={e => set("memo", e.target.value)} style={{ resize: "vertical" }} /></div>
-            <div><label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>参考URL（YouTube等）</label><input placeholder="https://..." value={form.url} onChange={e => set("url", e.target.value)} />{form.url && <a href={form.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#7a9fc0", display: "block", marginTop: 4 }}>🔗 URLを確認</a>}</div>
+            <div><label style={{ fontSize: 11, color: "#66776d", display: "block", marginBottom: 4, fontWeight: 700 }}>分類タグ</label><div style={{ display: "flex", gap: 8 }}>{TAGS.map(t => <button key={t} className={`pill-btn ${form.tag === t ? "active" : ""}`} onClick={() => set("tag", t)}>{t}</button>)}</div></div>
+            <div><label style={{ fontSize: 11, color: "#66776d", display: "block", marginBottom: 4, fontWeight: 700 }}>メモ・コツ</label><textarea rows={2} placeholder="調理のコツや気づきなど..." value={form.memo} onChange={e => set("memo", e.target.value)} style={{ resize: "vertical" }} /></div>
+            <div><label style={{ fontSize: 11, color: "#66776d", display: "block", marginBottom: 4, fontWeight: 700 }}>参考URL（YouTube等）</label><input placeholder="https://..." value={form.url} onChange={e => set("url", e.target.value)} />{form.url && <a href={form.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#5a8aa0", display: "block", marginTop: 4 }}>🔗 URLを確認</a>}</div>
           </div>
         )}
         {regTab === "steps" && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: "#8a7050" }}>手順を1ステップずつ入力してね</div>
+              <div style={{ fontSize: 12, color: "#66776d" }}>手順を1ステップずつ入力してね</div>
               <button className="btn btn-outline btn-sm" onClick={addStep}>＋ 追加</button>
             </div>
             {form.steps.map((step, i) => (
               <div key={i} style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "flex-start" }}>
                 <div className="step-num" style={{ flexShrink: 0, marginTop: 4 }}>{i + 1}</div>
                 <textarea rows={2} placeholder={`手順 ${i + 1}...`} value={step} onChange={e => setStep(i, e.target.value)} style={{ flex: 1, resize: "vertical", fontSize: 13, padding: "8px 10px" }} />
-                <button onClick={() => removeStep(i)} style={{ background: "none", border: "1.5px solid #e0d0c0", borderRadius: 8, cursor: "pointer", color: "#c0391b", width: 32, height: 32, fontSize: 14, flexShrink: 0, marginTop: 4 }}>×</button>
+                <button onClick={() => removeStep(i)} style={{ background: "none", border: "1.5px solid #dcd7ca", borderRadius: 8, cursor: "pointer", color: "#c0391b", width: 32, height: 32, fontSize: 14, flexShrink: 0, marginTop: 4 }}>×</button>
               </div>
             ))}
           </div>
@@ -1586,27 +1587,27 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ fontSize: 12, color: "#8a7050" }}>基本</div>
+                <div style={{ fontSize: 12, color: "#66776d" }}>基本</div>
                 <select value={form.servings || 2} onChange={e => set("servings", Number(e.target.value))} style={{ fontSize: 13, padding: "4px 8px", width: "auto" }}>
                   {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}人前</option>)}
                 </select>
-                <div style={{ fontSize: 12, color: "#8a7050" }}>で入力</div>
+                <div style={{ fontSize: 12, color: "#66776d" }}>で入力</div>
               </div>
               <button className="btn btn-outline btn-sm" onClick={addIng}>＋ 追加</button>
             </div>
             {form.ingredients.map((ing, i) => (
-              <div key={i} style={{ background: "#faf5ee", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+              <div key={i} style={{ background: "#f3f1ea", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 6, marginBottom: 6 }}>
                   <input placeholder="食材名" value={ing.name} onChange={e => setIng(i, "name", e.target.value)} style={{ fontSize: 13, padding: "7px 10px" }} />
                   <input placeholder="量" value={ing.amount} onChange={e => setIng(i, "amount", e.target.value)} style={{ fontSize: 13, padding: "7px 10px" }} />
                   <input placeholder="単位" value={ing.unit} onChange={e => setIng(i, "unit", e.target.value)} style={{ fontSize: 13, padding: "7px 10px" }} />
-                  <button onClick={() => removeIng(i)} style={{ background: "none", border: "1.5px solid #e0d0c0", borderRadius: 8, cursor: "pointer", color: "#c0391b", width: 32, fontSize: 14 }}>×</button>
+                  <button onClick={() => removeIng(i)} style={{ background: "none", border: "1.5px solid #dcd7ca", borderRadius: 8, cursor: "pointer", color: "#c0391b", width: 32, fontSize: 14 }}>×</button>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                   <select value={ing.type} onChange={e => setIng(i, "type", e.target.value)} style={{ fontSize: 12, padding: "6px 8px" }}><option>通常食材</option><option>調味料</option></select>
                   <div style={{ position: "relative" }}>
                     <select value={ing.category} onChange={e => setIng(i, "category", e.target.value)} style={{ fontSize: 12, padding: "6px 8px" }}>{STORE_ORDER.map(c => <option key={c}>{c}</option>)}</select>
-                    {ing._catAuto && inferCategory(ing.name) && <span style={{ position: "absolute", top: -7, right: 6, fontSize: 9, fontWeight: 700, background: "#a8470f", color: "#fff", borderRadius: 6, padding: "1px 5px" }}>自動</span>}
+                    {ing._catAuto && inferCategory(ing.name) && <span style={{ position: "absolute", top: -7, right: 6, fontSize: 9, fontWeight: 700, background: "#2e5d4e", color: "#fff", borderRadius: 6, padding: "1px 5px" }}>自動</span>}
                   </div>
                 </div>
               </div>
