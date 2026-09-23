@@ -1613,6 +1613,148 @@ function HistoryEditSheet({ historyItem, recipes, onSave, onClose }) {
 }
 
 // ── レシピ登録シート ──
+// ── 写真の範囲調整 ──
+// 4:3 の枠 = レシピ詳細の写真、中央の点線の正方形 = 一覧のサムネイル。ドラッグで移動、ピンチ/スライダーで拡大
+const PHOTO_ASPECT = 4 / 3
+function PhotoCropper({ file, onCancel, onDone }) {
+  const stageRef = useRef(null)
+  const [src, setSrc] = useState(null)
+  const [img, setImg] = useState(null)
+  const [failed, setFailed] = useState(false)
+  const [frameW, setFrameW] = useState(0)
+  const [view, setView] = useState(null) // { scale: 画面px/画像px, x, y: 画像左上の位置 }
+  const viewRef = useRef(null)
+  const pointers = useRef(new Map())
+  const gesture = useRef(null)
+  const frameH = frameW / PHOTO_ASPECT
+  const minScale = img && frameW ? Math.max(frameW / img.naturalWidth, frameH / img.naturalHeight) : 1
+  viewRef.current = view
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file)
+    const im = new Image()
+    im.onload = () => setImg(im)
+    im.onerror = () => setFailed(true)
+    im.src = url
+    setSrc(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
+  useEffect(() => {
+    const el = stageRef.current
+    if (!el) return
+    const measure = () => setFrameW(el.clientWidth)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [img])
+
+  // 画像が枠を必ず覆うように位置と倍率をおさえる
+  const clamp = useCallback(v => {
+    if (!img) return v
+    const scale = Math.min(Math.max(v.scale, minScale), minScale * 5)
+    const w = img.naturalWidth * scale, h = img.naturalHeight * scale
+    return { scale, x: Math.min(0, Math.max(frameW - w, v.x)), y: Math.min(0, Math.max(frameH - h, v.y)) }
+  }, [img, minScale, frameW, frameH])
+
+  // 初期表示：枠いっぱい・中央
+  useEffect(() => {
+    if (!img || !frameW) return
+    setView({ scale: minScale, x: (frameW - img.naturalWidth * minScale) / 2, y: (frameH - img.naturalHeight * minScale) / 2 })
+  }, [img, frameW]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // (cx, cy) を中心に倍率を変える
+  const zoomAt = (nextScale, cx, cy, base = viewRef.current) => {
+    if (!base) return
+    const r = nextScale / base.scale
+    setView(clamp({ scale: nextScale, x: cx - (cx - base.x) * r, y: cy - (cy - base.y) * r }))
+  }
+
+  const localPoint = e => { const b = stageRef.current.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top } }
+  const startGesture = () => {
+    const pts = [...pointers.current.values()]
+    gesture.current = { view: viewRef.current, pts: pts.map(p => ({ ...p })) }
+  }
+  const onPointerDown = e => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    pointers.current.set(e.pointerId, localPoint(e))
+    startGesture()
+  }
+  const onPointerMove = e => {
+    if (!pointers.current.has(e.pointerId) || !gesture.current?.view) return
+    pointers.current.set(e.pointerId, localPoint(e))
+    const now = [...pointers.current.values()]
+    const { view: v0, pts: p0 } = gesture.current
+    if (now.length === 1 && p0.length === 1) {
+      setView(clamp({ ...v0, x: v0.x + now[0].x - p0[0].x, y: v0.y + now[0].y - p0[0].y }))
+    } else if (now.length >= 2 && p0.length >= 2) {
+      const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+      const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+      const m0 = mid(p0[0], p0[1]), m1 = mid(now[0], now[1])
+      const scale = v0.scale * dist(now[0], now[1]) / Math.max(1, dist(p0[0], p0[1]))
+      // 指の中心にあった画像の点が、指の中心についてくるように
+      const ix = (m0.x - v0.x) / v0.scale, iy = (m0.y - v0.y) / v0.scale
+      setView(clamp({ scale, x: m1.x - ix * scale, y: m1.y - iy * scale }))
+    }
+  }
+  const onPointerUp = e => { pointers.current.delete(e.pointerId); startGesture() }
+  const onWheel = e => { const p = localPoint(e); zoomAt(viewRef.current.scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1), p.x, p.y) }
+
+  const confirm = () => {
+    if (!img || !view) return
+    const sw = frameW / view.scale, sh = frameH / view.scale
+    const outW = Math.round(Math.min(1280, sw)), outH = Math.round(outW / PHOTO_ASPECT)
+    const canvas = document.createElement("canvas")
+    canvas.width = outW; canvas.height = outH
+    canvas.getContext("2d").drawImage(img, -view.x / view.scale, -view.y / view.scale, sw, sh, 0, 0, outW, outH)
+    canvas.toBlob(blob => onDone(blob || file), "image/jpeg", 0.85)
+  }
+
+  const guide = "rgba(255,255,255,.55)"
+  return (
+    <div className="overlay" style={{ zIndex: 300, alignItems: "center", padding: 16 }}>
+      <div style={{ background: "#fbf9f4", borderRadius: 20, width: "100%", maxWidth: 440, padding: "18px 16px 16px", animation: "slideUp .25s" }}>
+        <div style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 17, fontWeight: 700, marginBottom: 4 }}>写真の範囲を調整</div>
+        <div style={{ fontSize: 12, color: "#66776d", marginBottom: 12, lineHeight: 1.6 }}>ドラッグで位置、2本指かスライダーで拡大できます</div>
+        {failed ? (
+          <div className="error-msg" style={{ marginBottom: 12 }}>この写真は範囲を調整できない形式のため、そのまま使います。</div>
+        ) : (
+          <div ref={stageRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}
+            style={{ position: "relative", width: "100%", aspectRatio: "4 / 3", overflow: "hidden", borderRadius: 12, background: "#1f2a24", touchAction: "none", cursor: "grab", userSelect: "none" }}>
+            {src && view && <img src={src} alt="" draggable={false}
+              style={{ position: "absolute", left: 0, top: 0, width: img.naturalWidth * view.scale, height: img.naturalHeight * view.scale, transform: `translate(${view.x}px, ${view.y}px)`, maxWidth: "none", pointerEvents: "none" }} />}
+            {!view && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><div className="spinner" style={{ margin: 0 }} /></div>}
+            {/* 三分割のガイド線 */}
+            {[1, 2].map(i => <div key={`v${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: `${(i * 100) / 3}%`, width: 1, background: "rgba(255,255,255,.25)", pointerEvents: "none" }} />)}
+            {[1, 2].map(i => <div key={`h${i}`} style={{ position: "absolute", left: 0, right: 0, top: `${(i * 100) / 3}%`, height: 1, background: "rgba(255,255,255,.25)", pointerEvents: "none" }} />)}
+            {/* 一覧のサムネイル（中央の正方形） */}
+            {frameW > 0 && <div style={{ position: "absolute", top: 0, bottom: 0, left: (frameW - frameH) / 2, width: frameH, border: `2px dashed ${guide}`, boxShadow: "0 0 0 1px rgba(0,0,0,.15)", pointerEvents: "none" }}>
+              <span style={{ position: "absolute", left: 6, top: 6, fontSize: 10, color: "#fff", background: "rgba(0,0,0,.45)", borderRadius: 6, padding: "2px 6px" }}>一覧のサムネイル</span>
+            </div>}
+            <span style={{ position: "absolute", right: 8, bottom: 8, fontSize: 10, color: "#fff", background: "rgba(0,0,0,.45)", borderRadius: 6, padding: "2px 6px", pointerEvents: "none" }}>枠全体：詳細画面の写真</span>
+          </div>
+        )}
+        {!failed && view && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 2px 4px" }}>
+            <span style={{ fontSize: 13 }}>🔍</span>
+            <input type="range" min={1} max={5} step={0.01} value={view.scale / minScale} aria-label="拡大"
+              onChange={e => zoomAt(minScale * Number(e.target.value), frameW / 2, frameH / 2)}
+              style={{ flex: 1, padding: 0, border: "none", background: "none", accentColor: "#2e5d4e" }} />
+            <button className="btn btn-ghost btn-sm" onClick={() => setView(clamp({ scale: minScale, x: (frameW - img.naturalWidth * minScale) / 2, y: (frameH - img.naturalHeight * minScale) / 2 }))}>リセット</button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          <button className="btn btn-outline" style={{ flex: 1 }} onClick={onCancel}>キャンセル</button>
+          <button className="btn btn-primary" style={{ flex: 2, padding: "12px" }} disabled={!failed && !view} onClick={() => failed ? onDone(file) : confirm()}>
+            {failed ? "そのまま使う" : "この範囲で決定"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── レシピ登録：タグを複数選ぶ（その場で新しいタグも作れる） ──
 function TagPicker({ tagDefs, value, onChange, onAddTag }) {
   const [adding, setAdding] = useState(false)
@@ -1680,13 +1822,20 @@ function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
   const removeIng = i => setForm(f => ({ ...f, ingredients: f.ingredients.filter((_, j) => j !== i) }))
 
   // 写真：選んだら縮小してすぐアップロード
-  const pickPhoto = async e => {
+  // 写真を選んだら、まず範囲調整の画面を出す
+  const [cropFile, setCropFile] = useState(null)
+  const pickPhoto = e => {
     const file = e.target.files?.[0]
     e.target.value = ""
-    if (!file) return
+    if (file) { setPhotoError(""); setCropFile(file) }
+  }
+  const uploadPhoto = async picked => {
+    const original = picked === cropFile
+    setCropFile(null)
     setPhotoError(""); setUploading(true)
     try {
-      const blob = await compressImage(file)
+      // 範囲調整済みならそのまま、調整できなかった元ファイルは縮小してから
+      const blob = original ? await compressImage(picked) : picked
       const path = await uploadRecipePhoto(userId, blob)
       uploadedPaths.current.push(path)
       set("photoPath", path)
@@ -1810,13 +1959,14 @@ function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
             </div>
             <div>
               <label style={{ fontSize: 11, color: "#66776d", display: "block", marginBottom: 4, fontWeight: 700 }}>写真</label>
-              <div className="photo-box" onClick={() => !uploading && fileInput.current?.click()} style={{ cursor: uploading ? "wait" : "pointer", ...(photoUrl ? {} : { aspectRatio: "auto", height: 72, flexDirection: "row" }) }}>
+              <div className="photo-box" onClick={() => !uploading && fileInput.current?.click()} style={{ cursor: uploading ? "wait" : "pointer", ...(photoUrl ? { aspectRatio: "4 / 3", maxHeight: "none" } : { aspectRatio: "auto", height: 72, flexDirection: "row" }) }}>
                 {photoUrl
                   ? <img src={photoUrl} alt="レシピ写真" />
                   : <><span style={{ fontSize: 24 }}>📷</span><span>タップして写真を追加</span></>}
                 {uploading && <div style={{ position: "absolute", inset: 0, background: "rgba(251,249,244,.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}><div className="spinner" style={{ marginBottom: 8 }} /><span>アップロード中...</span></div>}
               </div>
               <input ref={fileInput} type="file" accept="image/*" onChange={pickPhoto} style={{ display: "none" }} />
+              {cropFile && <PhotoCropper file={cropFile} onCancel={() => setCropFile(null)} onDone={uploadPhoto} />}
               {form.photoPath && !uploading && (
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   <button className="btn btn-outline btn-sm" style={{ flex: 1 }} onClick={() => fileInput.current?.click()}>📷 写真を変更</button>
