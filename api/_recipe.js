@@ -175,23 +175,51 @@ const PROMPT = `あなたは料理レシピの整理係です。与えられた�
 - memo: コツやポイントがあれば1〜2文。なければ ""。
 - 書かれていない材料や分量を推測で作らないこと。`
 
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
+let resolvedModel = null // 関数インスタンスが生きている間はキャッシュ
+
+// 指定モデルが無い（廃止・改名）ときは、このキーで使える最新の Flash 系モデルを探す
+async function pickAvailableModel(apiKey) {
+  const res = await fetch(`${GEMINI_BASE}/models?pageSize=200`, { headers: { "x-goog-api-key": apiKey } })
+  if (!res.ok) return null
+  const { models = [] } = await res.json()
+  const names = models
+    .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map(m => m.name.replace(/^models\//, ""))
+    .filter(n => /^gemini-[\d.]+-flash(-latest)?$/.test(n) || n === "gemini-flash-latest")
+  const version = n => parseFloat((n.match(/gemini-([\d.]+)/) || [])[1] || "0")
+  names.sort((a, b) => (b === "gemini-flash-latest") - (a === "gemini-flash-latest") || version(b) - version(a))
+  return names[0] || null
+}
+
+async function callGemini(apiKey, model, payload) {
+  return fetch(`${GEMINI_BASE}/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function geminiExtract({ apiKey, model, text, youtubeUrl }) {
   const parts = []
   if (youtubeUrl) parts.push({ fileData: { fileUri: youtubeUrl } })
   parts.push({ text: text ? `${PROMPT}\n\n---\n${text}` : `${PROMPT}\n\n---\nこの動画の内容からレシピを抽出してください。` })
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts }],
-      generationConfig: { responseMimeType: "application/json", responseSchema: RECIPE_SCHEMA, temperature: 0.2 },
-    }),
-  })
+  const payload = {
+    contents: [{ role: "user", parts }],
+    generationConfig: { responseMimeType: "application/json", responseSchema: RECIPE_SCHEMA, temperature: 0.2 },
+  }
+  let res = await callGemini(apiKey, resolvedModel || model, payload)
+  if (res.status === 404) {
+    const fallback = await pickAvailableModel(apiKey)
+    if (fallback) { resolvedModel = fallback; res = await callGemini(apiKey, fallback, payload) }
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => "")
+    const detail = (() => { try { return JSON.parse(body).error?.message || "" } catch { return "" } })()
+    console.error("Gemini error", res.status, detail)
     if (res.status === 429) throw new Error("AIの無料枠の上限に達しました。しばらく待ってから試してください")
-    if (res.status === 400 && /API key/i.test(body)) throw new Error("GEMINI_API_KEY が正しくありません")
-    throw new Error(`AIの呼び出しに失敗しました（${res.status}）`)
+    if (/API key/i.test(detail)) throw new Error("GEMINI_API_KEY が正しくありません。Vercel の設定を確認してください")
+    throw new Error(`AIの呼び出しに失敗しました（${res.status}${detail ? `: ${detail.slice(0, 120)}` : ""}）`)
   }
   const json = await res.json()
   const out = json.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || ""
