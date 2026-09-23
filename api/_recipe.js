@@ -230,17 +230,27 @@ export async function geminiExtract({ apiKey, model, text, youtubeUrl }) {
     throw new Error(`AIの呼び出しに失敗しました（${res.status}${detail ? `: ${detail.slice(0, 120)}` : ""}）`)
   }
   const json = await res.json()
-  const out = json.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || ""
+  // 思考過程（thought）のパートは除き、```json で囲まれていても読めるようにする
+  const out = (json.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || "").join("")
+    .replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "")
   let data
-  try { data = JSON.parse(out) } catch { throw new Error("AIの応答を読み取れませんでした") }
-  if (!data.found) return null
-  return {
+  try { data = JSON.parse(out) } catch {
+    console.error("Gemini unparsable", json.candidates?.[0]?.finishReason, out.slice(0, 500))
+    throw new Error("AIの応答を読み取れませんでした。もう一度試してください")
+  }
+  const recipe = {
     name: data.name || "",
     servings: data.servings || null,
     memo: data.memo || "",
-    ingredients: (data.ingredients || []).filter(i => i.name).map(i => ({
-      name: i.name.trim(), amount: toHalfWidth(i.amount || "").trim(), unit: (i.unit || "").trim(), isSeasoning: !!i.isSeasoning,
+    ingredients: (data.ingredients || []).filter(i => i && i.name).map(i => ({
+      name: String(i.name).trim(), amount: toHalfWidth(i.amount ?? "").trim(), unit: String(i.unit || "").trim(), isSeasoning: !!i.isSeasoning,
     })),
-    steps: (data.steps || []).map(s => s.trim()).filter(Boolean),
+    steps: (data.steps || []).map(s => String(s).trim()).filter(Boolean),
   }
+  // found フラグだけに頼らず、材料か手順が取れていればレシピとして扱う
+  if (!recipe.ingredients.length && !recipe.steps.length) {
+    console.error("Gemini found no recipe", JSON.stringify(data).slice(0, 500))
+    return null
+  }
+  return recipe
 }
