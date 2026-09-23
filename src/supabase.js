@@ -84,19 +84,24 @@ export async function getShoppingChecks(userId) {
 // onChange(checks) : 他端末を含む shopping_checks の変更
 // onStatus(status) : "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED"
 // 戻り値は購読解除関数
-export function subscribeShoppingChecks(userId, onChange, onStatus) {
+// onRow(row) : 変更後の行（shopping_checks・data）。行が大きいと列が省略されることがあるので、
+//              その列が無いときは呼び出し側で取り直す
+export function subscribeUserRow(userId, onRow, onStatus) {
   const channel = supabase
-    .channel(`shopping-checks-${userId}-${Date.now()}`)
+    .channel(`user-row-${userId}-${Date.now()}`)
     .on("postgres_changes",
       { event: "UPDATE", schema: "public", table: "users", filter: `id=eq.${userId}` },
-      payload => {
-        const row = payload.new || {}
-        // 行が大きいと列が省略されることがあるので、その場合は取り直す
-        if (Array.isArray(row.shopping_checks)) onChange(row.shopping_checks)
-        else getShoppingChecks(userId).then(onChange).catch(() => {})
-      })
+      payload => onRow(payload.new || {}))
     .subscribe(status => onStatus && onStatus(status))
   return () => { supabase.removeChannel(channel) }
+}
+
+// 同期用：レシピ等のデータとチェック状態だけを取る（パスワードのハッシュは取らない）
+export async function getUserSyncState(userId) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=data,shopping_checks`, { headers })
+  if (!res.ok) throw new Error("取得失敗")
+  const rows = await res.json()
+  return rows[0] || null
 }
 
 // ── レシピ写真（Supabase Storage: recipe-photos） ──

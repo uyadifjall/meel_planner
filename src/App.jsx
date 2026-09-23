@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import {
-  hashPassword, getUser, createUser, saveData, saveShoppingChecks, getShoppingChecks,
-  subscribeShoppingChecks, uploadRecipePhoto, deleteRecipePhoto, getRecipePhotoUrl,
+  hashPassword, getUser, createUser, saveData, saveShoppingChecks,
+  subscribeUserRow, getUserSyncState, uploadRecipePhoto, deleteRecipePhoto, getRecipePhotoUrl,
 } from "./supabase.js"
 
 // ── 定数 ──
@@ -42,6 +42,13 @@ function resolveTagDefs(saved, recipes) {
 function TagChip({ name, defs, small }) {
   const c = TAG_COLORS[defs?.find(d => d.name === name)?.color] || TAG_COLORS.gray
   return <span className="tag" style={{ background: c.bg, color: c.fg, ...(small ? { fontSize: 10, padding: "2px 8px" } : {}) }}>{name}</span>
+}
+
+// キーの順番に関係なく同じ内容なら同じ文字列になる JSON 化（DB の jsonb はキー順が変わるため）
+function stableStringify(v) {
+  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]"
+  if (v && typeof v === "object") return "{" + Object.keys(v).sort().filter(k => v[k] !== undefined).map(k => JSON.stringify(k) + ":" + stableStringify(v[k])).join(",") + "}"
+  return JSON.stringify(v ?? null)
 }
 
 // 検索用：カタカナ→ひらがな・小文字にそろえる
@@ -581,55 +588,93 @@ export default function App() {
 
   const showToast = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 2500) }
 
+  // ── 保存データを画面に反映（起動時・ログイン時・他の端末での変更） ──
+  const applyData = useCallback(d => {
+    d = d || {}
+    const recs = d.recipes || SAMPLE_RECIPES
+    setRecipes(recs)
+    setTagDefs(resolveTagDefs(d.tagDefs, recs))
+    setPlanEntries(d.planEntries || [])
+    setBentoEntries(d.bentoEntries || [])
+    setSeasoningChecks(d.seasoningChecks || {})
+    setShoppingAdjust(d.shoppingAdjust || {})
+    setDeletedItems(new Set(d.deletedItems || []))
+    setManualItems(d.manualItems || [])
+    setDrugItems(d.drugItems || [])
+    setHistory(d.history || [])
+    // 開いているレシピ詳細も最新にする（他の端末で削除されていたら閉じる）
+    setDetailRecipe(cur => cur ? (recs.find(r => r.id === cur.id) || null) : cur)
+  }, [])
+
+  // 最後にサーバーと一致していたデータ（キー順を無視した文字列）。自分の保存の反響を見分けるのに使う
+  const lastSyncedData = useRef("")
+  // 自分の変更がまだ保存されていない間は、他の端末のデータで上書きしない
+  const unsavedChanges = useRef(false)
+  const saveSeq = useRef(0)
+
   // ── 起動時に自動ログイン ──
   useEffect(() => {
     const uid = getSavedUid()
     if (!uid) { setAutoLogging(false); return }
     getUser(uid).then(user => {
       if (user) {
-        const d = user.data || {}
         setUserId(uid)
-        setRecipes(d.recipes || SAMPLE_RECIPES)
-        setTagDefs(resolveTagDefs(d.tagDefs, d.recipes || SAMPLE_RECIPES))
-        setPlanEntries(d.planEntries || [])
-        setBentoEntries(d.bentoEntries || [])
-        setSeasoningChecks(d.seasoningChecks || {})
-        setShoppingAdjust(d.shoppingAdjust || {})
-        setDeletedItems(new Set(d.deletedItems || []))
-        setManualItems(d.manualItems || [])
-        setDrugItems(d.drugItems || [])
-        setHistory(d.history || [])
+        applyData(user.data)
+        lastSyncedData.current = stableStringify(user.data || {})
       } else { clearUid() }
       setAutoLogging(false)
     }).catch(() => { clearUid(); setAutoLogging(false) })
-  }, [])
+  }, [applyData])
 
-  // ── チェック状態の同期（Realtime、切断時は30秒ポーリングにフォールバック） ──
+  // ── 他の端末との同期（Realtime、切断時は30秒ポーリングにフォールバック） ──
+  // チェック状態に加えて、レシピ・写真・献立などのデータも反映する
   useEffect(() => {
     if (!userId) return
     let unsubscribe = null
     let pollTimer = null
     let reconcileTimer = null
+    let refetchTimer = null
     let disposed = false
     let gen = 0 // 古いチャンネルからのステータス通知を無視するための世代番号
 
-    const applyRemote = checks => {
+    const applyChecks = checks => {
       if (disposed) return
       // 自分の書き込み直後に届く古いイベントで表示が巻き戻らないよう、少し待ってから取り直す
       const sinceLocal = Date.now() - lastLocalCheckWrite.current
       if (sinceLocal < 1500) {
         clearTimeout(reconcileTimer)
-        reconcileTimer = setTimeout(fetchChecks, 1500 - sinceLocal)
+        reconcileTimer = setTimeout(fetchAll, 1500 - sinceLocal)
         return
       }
       const next = checks || []
       setCheckedItems(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
     }
-    const fetchChecks = () => getShoppingChecks(userId).then(applyRemote).catch(() => {})
+    const applyRemoteData = data => {
+      if (disposed || !data || unsavedChanges.current) return
+      const key = stableStringify(data)
+      if (key === lastSyncedData.current) return // 自分の保存の反響、または変化なし
+      lastSyncedData.current = key
+      applyData(data)
+      showToast("他の端末の変更を反映しました")
+    }
+    const fetchAll = () => getUserSyncState(userId).then(row => {
+      if (!row) return
+      applyChecks(row.shopping_checks)
+      applyRemoteData(row.data)
+    }).catch(() => {})
+    // イベントが続いたときにまとめて1回だけ取り直す
+    const refetchSoon = () => { clearTimeout(refetchTimer); refetchTimer = setTimeout(fetchAll, 300) }
+
+    const onRow = row => {
+      if (Array.isArray(row.shopping_checks)) applyChecks(row.shopping_checks)
+      // 行が大きいと data が省略されて届くので、その場合は取り直す
+      if (row.data && typeof row.data === "object") applyRemoteData(row.data)
+      else refetchSoon()
+    }
 
     const startPolling = () => {
       if (pollTimer) return
-      pollTimer = setInterval(fetchChecks, 30000)
+      pollTimer = setInterval(fetchAll, 30000)
     }
     const stopPolling = () => { clearInterval(pollTimer); pollTimer = null }
 
@@ -637,11 +682,11 @@ export default function App() {
       if (unsubscribe) return
       const myGen = ++gen
       setSyncStatus("connecting")
-      unsubscribe = subscribeShoppingChecks(userId, applyRemote, status => {
+      unsubscribe = subscribeUserRow(userId, onRow, status => {
         if (disposed || myGen !== gen) return
         if (status === "SUBSCRIBED") {
           stopPolling(); setSyncStatus("live")
-          fetchChecks() // 未接続の間に起きた変更を取り込む
+          fetchAll() // 未接続の間に起きた変更を取り込む
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
           if (document.visibilityState === "hidden") return
           startPolling(); setSyncStatus("polling")
@@ -657,10 +702,10 @@ export default function App() {
     // バックグラウンドでは購読を止め、戻ったら再接続＋最新を取得
     const onVisibility = () => {
       if (document.visibilityState === "hidden") { disconnect(); setSyncStatus("paused") }
-      else { fetchChecks(); connect() }
+      else { fetchAll(); connect() }
     }
 
-    fetchChecks()
+    fetchAll()
     if (document.visibilityState !== "hidden") connect()
     else setSyncStatus("paused")
     document.addEventListener("visibilitychange", onVisibility)
@@ -668,28 +713,30 @@ export default function App() {
       disposed = true
       document.removeEventListener("visibilitychange", onVisibility)
       clearTimeout(reconcileTimer)
+      clearTimeout(refetchTimer)
       disconnect()
     }
-  }, [userId])
+  }, [userId, applyData])
 
   const handleLogin = (uid, data) => {
     setUserId(uid)
-    setRecipes(data.recipes || SAMPLE_RECIPES)
-    setTagDefs(resolveTagDefs(data.tagDefs, data.recipes || SAMPLE_RECIPES))
-    setPlanEntries(data.planEntries || [])
-    setBentoEntries(data.bentoEntries || [])
-    setSeasoningChecks(data.seasoningChecks || {})
-    setShoppingAdjust(data.shoppingAdjust || {})
-    setDeletedItems(new Set(data.deletedItems || []))
-    setManualItems(data.manualItems || [])
-    setDrugItems(data.drugItems || [])
-    setHistory(data.history || [])
+    applyData(data)
+    lastSyncedData.current = stableStringify(data || {})
+    unsavedChanges.current = false
     setScreen("catalog")
   }
 
   // ── 信頼性の高い保存（isSaving フラグ付き） ──
   const triggerSave = useCallback((newData) => {
     if (!userId) return
+    unsavedChanges.current = true
+    const seq = ++saveSeq.current
+    // 保存できたら「サーバーと一致」の印を更新（あとから別の変更が入っていれば未保存のまま）
+    const markSaved = () => {
+      if (seq !== saveSeq.current) return
+      unsavedChanges.current = false
+      lastSyncedData.current = stableStringify(newData)
+    }
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
       if (isSaving.current) {
@@ -700,12 +747,13 @@ export default function App() {
       isSaving.current = true
       try {
         await saveData(userId, newData)
+        markSaved()
         showToast("保存しました ✓")
       } catch (e) {
         showToast("保存失敗、再試行します...", "warn")
         // 5秒後にリトライ
         setTimeout(async () => {
-          try { await saveData(userId, newData); showToast("保存しました ✓") }
+          try { await saveData(userId, newData); markSaved(); showToast("保存しました ✓") }
           catch { showToast("保存に失敗しました", "error") }
         }, 5000)
       } finally { isSaving.current = false }
