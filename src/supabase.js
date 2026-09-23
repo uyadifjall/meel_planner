@@ -1,5 +1,14 @@
+import { createClient } from "@supabase/supabase-js"
+
 const SUPABASE_URL = "https://icdxnlkgrxsccqbrmsad.supabase.co"
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljZHhubGtncnhzY2NxYnJtc2FkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNDgxNDQsImV4cCI6MjA5NTYyNDE0NH0.1yLiXwKYfgPRb6B2u2ZaQBBjKqmSc4iUGdlYiE_IL9U"
+
+// Realtime / Storage 用クライアント（認証は独自実装のため Supabase Auth のセッションは使わない）
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+})
+
+const PHOTO_BUCKET = "recipe-photos"
 
 const headers = {
   "Content-Type": "application/json",
@@ -69,4 +78,49 @@ export async function getShoppingChecks(userId) {
   if (!res.ok) return []
   const rows = await res.json()
   return rows[0]?.shopping_checks || []
+}
+
+// ── チェック状態のリアルタイム購読（postgres_changes） ──
+// onChange(checks) : 他端末を含む shopping_checks の変更
+// onStatus(status) : "SUBSCRIBED" | "CHANNEL_ERROR" | "TIMED_OUT" | "CLOSED"
+// 戻り値は購読解除関数
+export function subscribeShoppingChecks(userId, onChange, onStatus) {
+  const channel = supabase
+    .channel(`shopping-checks-${userId}-${Date.now()}`)
+    .on("postgres_changes",
+      { event: "UPDATE", schema: "public", table: "users", filter: `id=eq.${userId}` },
+      payload => {
+        const row = payload.new || {}
+        // 行が大きいと列が省略されることがあるので、その場合は取り直す
+        if (Array.isArray(row.shopping_checks)) onChange(row.shopping_checks)
+        else getShoppingChecks(userId).then(onChange).catch(() => {})
+      })
+    .subscribe(status => onStatus && onStatus(status))
+  return () => { supabase.removeChannel(channel) }
+}
+
+// ── レシピ写真（Supabase Storage: recipe-photos） ──
+export async function uploadRecipePhoto(userId, blob) {
+  const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg"
+  // Storage のキーに使えない文字（日本語など）は置き換える
+  const folder = String(userId).replace(/[^a-zA-Z0-9_-]/g, "_") || "user"
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const { error } = await supabase.storage.from(PHOTO_BUCKET).upload(path, blob, {
+    contentType: blob.type || "image/jpeg",
+    cacheControl: "31536000",
+    upsert: false,
+  })
+  if (error) throw new Error(error.message || "写真のアップロードに失敗しました")
+  return path
+}
+
+export async function deleteRecipePhoto(path) {
+  if (!path) return
+  const { error } = await supabase.storage.from(PHOTO_BUCKET).remove([path])
+  if (error) throw new Error(error.message || "写真の削除に失敗しました")
+}
+
+export function getRecipePhotoUrl(path) {
+  if (!path) return null
+  return supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl
 }
