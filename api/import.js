@@ -1,11 +1,12 @@
 // POST /api/import { url } → レシピの下書きを返す
 // 1. レシピサイト：ページ内の schema.org Recipe（JSON-LD）を読む（AI不使用・無料）
 // 2. YouTube：概要欄を Gemini で整理。概要欄にレシピがなければ動画そのものを Gemini に見せる
-// 3. JSON-LD がないサイト：本文テキストを Gemini で整理
+// 3. JSON-LD がないサイト：本文テキストを Gemini で整理（クックパッドは HTML から直接読む）
+// POST /api/import { text } → 貼り付けたレシピ文章を Gemini で整理
 import { lookup } from "node:dns/promises"
 import net from "node:net"
 import {
-  extractJsonLdRecipe, htmlToText, getYouTubeId, geminiExtract, cleanText,
+  extractJsonLdRecipe, extractCookpadRecipe, htmlToText, getYouTubeId, geminiExtract, cleanText,
 } from "./_recipe.js"
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -88,13 +89,23 @@ export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return }
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {})
   const url = String(body.url || "").trim()
-  if (!url) { res.status(400).json({ error: "URLを入力してください" }); return }
+  const pasted = String(body.text || "").trim()
+  if (!url && !pasted) { res.status(400).json({ error: "URLかレシピの文章を入力してください" }); return }
 
   const apiKey = process.env.GEMINI_API_KEY
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash"
-  const noKey = () => res.status(400).json({ error: "このURLはAIでの読み取りが必要です。Vercel に GEMINI_API_KEY を設定してください" })
+  const noKey = () => res.status(400).json({ error: "AIでの読み取りが必要です。Vercel に GEMINI_API_KEY を設定してください" })
 
   try {
+    // 貼り付けテキスト
+    if (pasted) {
+      if (!apiKey) return noKey()
+      const recipe = await geminiExtract({ apiKey, model, text: `貼り付けられたレシピ:\n${pasted.slice(0, 15000)}` })
+      if (!recipe) { res.status(422).json({ error: "文章からレシピを読み取れませんでした" }); return }
+      res.status(200).json({ recipe: { ...recipe, url: url || "" }, source: "ai-text" })
+      return
+    }
+
     const videoId = getYouTubeId(url)
     if (videoId) {
       if (!apiKey) return noKey()
@@ -117,6 +128,17 @@ export default async function handler(req, res) {
     }
 
     const html = await fetchHtml(url)
+    if (/(^|\.)cookpad\.com$/.test(new URL(url).hostname)) {
+      const cp = extractCookpadRecipe(html)
+      if (cp) {
+        const { truncated, ...recipe } = cp
+        const warning = truncated
+          ? "クックパッドはログインしないと材料・作り方の一部しか見られないため、見えている部分だけ取り込みました。残りはクックパッドのアプリでレシピをコピーし、「文章から」で貼り付けてください"
+          : null
+        res.status(200).json({ recipe: { ...recipe, url }, source: "cookpad", warning })
+        return
+      }
+    }
     const fromLd = extractJsonLdRecipe(html)
     if (fromLd && fromLd.ingredients.length) {
       res.status(200).json({ recipe: { ...fromLd, url }, source: "jsonld" })

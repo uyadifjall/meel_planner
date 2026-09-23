@@ -21,7 +21,9 @@ export function cleanText(str) {
 }
 
 // ── 材料1行を 名前・量・単位 に分解（例：「鶏もも肉 1枚(300g)」「(A)しょうゆ 大さじ2」「塩 少々」）──
-const SPOON = "大さじ|小さじ|大匙|小匙|カップ"
+// 「大1/2」「小1」の省略形も含む（直後に数字が来る場合だけマッチするので「大根」「小松菜」は対象外）
+const SPOON = "大さじ|小さじ|大匙|小匙|カップ|大|小"
+function normalizeSpoon(u) { return u === "大" || u === "大匙" ? "大さじ" : u === "小" || u === "小匙" ? "小さじ" : u }
 const UNITS = "kg|g|ml|mL|cc|L|l|カップ|個|本|枚|片|かけ|玉|袋|パック|缶|束|株|房|切れ|切|尾|杯|合|丁|cm|センチ|粒|さじ|つまみ|箱|尾分|個分|本分|枚分"
 const NUM = "\\d+(?:\\.\\d+)?(?:\\/\\d+)?(?:と\\d+\\/\\d+)?"
 const VAGUE = "少々|適量|適宜|ひとつまみ|少量|お好みで|お好み|各適量|各少々"
@@ -36,7 +38,7 @@ export function parseIngredientLine(line) {
   if (!m || m.index === 0) return { name: s, amount: "", unit: "" }
   const name = s.slice(0, m.index).replace(/[\s…:：・.、,]+$/, "").trim()
   if (!name) return { name: s, amount: "", unit: "" }
-  if (m[1]) return { name, amount: m[2], unit: m[1].replace("大匙", "大さじ").replace("小匙", "小さじ") }
+  if (m[1]) return { name, amount: m[2], unit: normalizeSpoon(m[1]) }
   if (m[3]) return { name, amount: m[3], unit: m[4] || "" }
   return { name, amount: "", unit: m[5] }
 }
@@ -83,6 +85,34 @@ export function extractJsonLdRecipe(html) {
     }
   }
   return null
+}
+
+// 分量だけの文字列（例「中3個（200g）」「大さじ2」「ひとつまみ」）を量と単位に
+export function parseQuantity(qty) {
+  const s = toHalfWidth(cleanText(qty)).replace(/\s+/g, " ").trim()
+  const m = s.match(QTY_RE)
+  if (!m) return { amount: "", unit: s }
+  if (m[1]) return { amount: m[2], unit: normalizeSpoon(m[1]) }
+  if (m[3]) return { amount: m[3], unit: m[4] || "" }
+  return { amount: "", unit: m[5] }
+}
+
+// ── クックパッド（JSON-LD がないため HTML から読む）──
+// 未ログインでは材料・手順の一部しか表示されないことがあるので、その場合は truncated を立てる
+export function extractCookpadRecipe(html) {
+  const flat = html.replace(/\n/g, " ")
+  const ingredients = [...flat.matchAll(/<li id="ingredient_\d+"[^>]*class="([^"]*)"[^>]*>\s*<span>([\s\S]*?)<\/span>\s*(?:<bdi[^>]*>([\s\S]*?)<\/bdi>)?/g)]
+    .filter(m => !/\bheadline\b/.test(m[1].replace("not-headline", "")))
+    .map(m => ({ name: cleanText(m[2]).replace(/^[・●○◯◎☆★◆◇■□※]+\s*/, ""), ...parseQuantity(m[3] || ""), isSeasoning: null }))
+    .filter(i => i.name)
+  const steps = [...flat.matchAll(/id="step_\d+"[^>]*>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/g)]
+    .map(m => cleanText(m[1])).filter(Boolean)
+  if (!ingredients.length && !steps.length) return null
+  const title = decodeEntities((html.match(/<meta property="og:title" content="([^"]*)"/) || [])[1] || "")
+  const servingText = cleanText((flat.match(/id="serving_recipe_\d+"[^>]*>([\s\S]*?)<\/div>/) || [])[1] || "")
+  const servings = parseInt((toHalfWidth(servingText).match(/(\d+)\s*[〜~～-]?\s*\d*\s*人/) || [])[1], 10) || null
+  const truncated = /あと\d+点あります/.test(flat) || /premium-recipe-explanation-target/.test(flat) && steps.length < 3
+  return { name: title.replace(/\s*by\s+.+$/, "").trim(), servings, memo: "", ingredients, steps, truncated }
 }
 
 // ページ本文をAIに渡すためのテキスト化

@@ -1453,18 +1453,21 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
   }
   const photoUrl = getRecipePhotoUrl(form.photoPath)
 
-  // ── URLから取り込み（レシピサイト・YouTube） ──
+  // ── URL・文章から取り込み（レシピサイト・YouTube・貼り付け） ──
+  const [importMode, setImportMode] = useState("url") // url | text
   const [importUrl, setImportUrl] = useState("")
+  const [importText, setImportText] = useState("")
   const [importing, setImporting] = useState(false)
-  const [importMsg, setImportMsg] = useState(null) // { type: "ok" | "error", text }
+  const [importMsg, setImportMsg] = useState(null) // { type: "ok" | "warn" | "error", text }
   const runImport = async () => {
-    const url = importUrl.trim()
-    if (!url || importing) return
+    const url = importMode === "url" ? importUrl.trim() : ""
+    const text = importMode === "text" ? importText.trim() : ""
+    if ((!url && !text) || importing) return
     const hasContent = form.name || form.ingredients.some(i => i.name) || form.steps.some(s => s.trim())
     if (hasContent && !window.confirm("入力中の料理名・材料・作り方を、取り込んだ内容で置き換えますか？")) return
     setImporting(true); setImportMsg(null)
     try {
-      const res = await fetch("/api/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) })
+      const res = await fetch("/api/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(text ? { text } : { url }) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.recipe) throw new Error(data.error || `取り込みに失敗しました（${res.status}）`)
       const r = data.recipe
@@ -1478,16 +1481,18 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
       setForm(f => ({
         ...f,
         name: r.name || f.name,
-        url: r.url || url,
+        url: r.url || url || f.url,
         memo: r.memo || f.memo,
         servings: r.servings || f.servings || 2,
         steps: r.steps.length ? r.steps : [""],
         ingredients: ingredients.length ? ingredients : [blankIng()],
       }))
-      setImportMsg({ type: "ok", text: data.source === "jsonld"
-        ? `✓ サイトのレシピ情報から取り込みました（材料${ingredients.length}件・手順${r.steps.length}件）`
-        : `✓ AIで読み取りました（材料${ingredients.length}件・手順${r.steps.length}件）。分量と手順を確認してから保存してください` })
-      setImportUrl("")
+      const counts = `材料${ingredients.length}件・手順${r.steps.length}件`
+      if (data.warning) setImportMsg({ type: "warn", text: `${counts}を取り込みました。${data.warning}` })
+      else setImportMsg({ type: "ok", text: data.source === "jsonld" || data.source === "cookpad"
+        ? `✓ サイトのレシピ情報から取り込みました（${counts}）`
+        : `✓ AIで読み取りました（${counts}）。分量と手順を確認してから保存してください` })
+      if (text) setImportText(""); else setImportUrl("")
     } catch (e) {
       setImportMsg({ type: "error", text: e.message || "取り込みに失敗しました" })
     }
@@ -1509,13 +1514,32 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
         {regTab === "basic" && (
           <div style={{ display: "grid", gap: 14 }}>
             <div style={{ background: "#fff7ed", border: "1.5px solid #e8c87a", borderRadius: 12, padding: "12px 14px" }}>
-              <label style={{ fontSize: 11, color: "#8a6010", display: "block", marginBottom: 6, fontWeight: 700 }}>🔗 URLから取り込む（レシピサイト・YouTube）</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input placeholder="https://..." value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && runImport()} disabled={importing} inputMode="url" autoCapitalize="none" autoCorrect="off" style={{ flex: 1, fontSize: 13, padding: "8px 10px", background: "#fff" }} />
-                <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importUrl.trim()} style={{ whiteSpace: "nowrap" }}>{importing ? "読み取り中..." : "取り込む"}</button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
+                <label style={{ fontSize: 11, color: "#8a6010", fontWeight: 700 }}>🔗 レシピを取り込む</label>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {[{ id: "url", label: "URL" }, { id: "text", label: "文章から" }].map(m => (
+                    <button key={m.id} className={`pill-btn ${importMode === m.id ? "active" : ""}`} style={{ padding: "3px 10px", fontSize: 11 }} onClick={() => { setImportMode(m.id); setImportMsg(null) }} disabled={importing}>{m.label}</button>
+                  ))}
+                </div>
               </div>
-              {importing && <div style={{ fontSize: 11, color: "#8a6010", marginTop: 6 }}>動画の場合は数十秒かかることがあります</div>}
-              {importMsg && <div className={importMsg.type === "error" ? "error-msg" : ""} style={importMsg.type === "error" ? {} : { fontSize: 12, color: "#1b7a3e", marginTop: 6, lineHeight: 1.5 }}>{importMsg.type === "error" ? `⚠️ ${importMsg.text}` : importMsg.text}</div>}
+              {importMode === "url" ? (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input placeholder="レシピサイト・YouTube の URL" value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && runImport()} disabled={importing} inputMode="url" autoCapitalize="none" autoCorrect="off" style={{ flex: 1, fontSize: 13, padding: "8px 10px", background: "#fff" }} />
+                  <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importUrl.trim()} style={{ whiteSpace: "nowrap" }}>{importing ? "読み取り中..." : "取り込む"}</button>
+                </div>
+              ) : (
+                <>
+                  <textarea rows={5} placeholder={"クックパッドのアプリなどでレシピをコピーして貼り付け\n（料理名・材料・作り方がまとめて入っていればOK）"} value={importText} onChange={e => setImportText(e.target.value)} disabled={importing} style={{ fontSize: 13, padding: "8px 10px", background: "#fff", resize: "vertical" }} />
+                  <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importText.trim()} style={{ width: "100%", marginTop: 8 }}>{importing ? "AIで読み取り中..." : "AIで取り込む"}</button>
+                </>
+              )}
+              {importing && importMode === "url" && <div style={{ fontSize: 11, color: "#8a6010", marginTop: 6 }}>動画の場合は数十秒かかることがあります</div>}
+              {importMsg && (importMsg.type === "error"
+                ? <div className="error-msg">⚠️ {importMsg.text}</div>
+                : <div style={{ fontSize: 12, color: importMsg.type === "warn" ? "#8a6000" : "#1b7a3e", background: importMsg.type === "warn" ? "#fff3d6" : "transparent", borderRadius: 8, padding: importMsg.type === "warn" ? "8px 10px" : 0, marginTop: 6, lineHeight: 1.6 }}>
+                    {importMsg.type === "warn" ? "⚠️ " : ""}{importMsg.text}
+                    {importMsg.type === "warn" && <button className="btn btn-outline btn-sm" style={{ display: "flex", marginTop: 6, fontSize: 11 }} onClick={() => { setImportMode("text"); setImportMsg(null) }}>「文章から」に切り替える</button>}
+                  </div>)}
             </div>
             <div>
               <label style={{ fontSize: 11, color: "#8a7050", display: "block", marginBottom: 4, fontWeight: 700 }}>写真</label>
