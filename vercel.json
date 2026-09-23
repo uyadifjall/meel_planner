@@ -1,4 +1,5 @@
 {
+  "regions": ["hnd1"],
   "functions": {
     "api/import.js": { "maxDuration": 60 }
   }

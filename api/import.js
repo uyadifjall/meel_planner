@@ -67,22 +67,35 @@ async function fetchHtml(url) {
   throw new Error("リダイレクトが多すぎます")
 }
 
-// YouTube の動画ページからタイトルと概要欄を取り出す
-async function fetchYouTubeInfo(videoId) {
+// YouTube のタイトルと概要欄を取り出す
+// 1. YouTube Data API（YOUTUBE_API_KEY、なければ GEMINI_API_KEY。Google Cloud で YouTube Data API v3 を有効にすると使える）
+// 2. 動画ページ（クラウドのサーバーからだとボット確認で弾かれることがある）
+// 3. oEmbed（タイトルだけ）
+async function fetchYouTubeInfo(videoId, apiKey) {
+  if (apiKey) {
+    try {
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&hl=ja&id=${encodeURIComponent(videoId)}&key=${encodeURIComponent(apiKey)}`,
+        { signal: AbortSignal.timeout(10000) })
+      if (r.ok) {
+        const s = (await r.json()).items?.[0]?.snippet
+        if (s) return { title: s.localized?.title || s.title || "", description: s.localized?.description || s.description || "", via: "api" }
+      } else console.error("YouTube Data API", r.status, (await r.text()).slice(0, 200))
+    } catch (e) { console.error("YouTube Data API", e.message) }
+  }
   try {
     const html = await fetchHtml(`https://www.youtube.com/watch?v=${videoId}&hl=ja`)
     const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]+?\})\s*;\s*(?:var\s|<\/script>)/)
     if (m) {
       const d = JSON.parse(m[1]).videoDetails || {}
-      return { title: d.title || "", description: d.shortDescription || "" }
+      if (d.shortDescription) return { title: d.title || "", description: d.shortDescription, via: "page" }
     }
   } catch {}
   // 取れなければ oEmbed でタイトルだけ
   try {
     const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`)
-    if (res.ok) return { title: (await res.json()).title || "", description: "" }
+    if (res.ok) return { title: (await res.json()).title || "", description: "", via: "oembed" }
   } catch {}
-  return { title: "", description: "" }
+  return { title: "", description: "", via: "none" }
 }
 
 export default async function handler(req, res) {
@@ -112,10 +125,10 @@ export default async function handler(req, res) {
     const videoId = getYouTubeId(url)
     if (videoId) {
       const watchUrl = `https://www.youtube.com/watch?v=${videoId}`
-      const { title, description } = await fetchYouTubeInfo(videoId)
+      const { title, description, via } = await fetchYouTubeInfo(videoId, process.env.YOUTUBE_API_KEY || apiKey)
       // 概要欄に「材料…分量」の形で書かれていれば AI なしで読める
       const plain = description ? parsePlainRecipe(description, title) : null
-      if (plain) { res.status(200).json({ recipe: { ...plain, url: watchUrl }, source: "youtube-text" }); return }
+      if (plain) { res.status(200).json({ recipe: { ...plain, url: watchUrl }, source: "youtube-text", via }); return }
       if (!apiKey) return noKey()
       let recipe = null
       if (description.trim()) {
@@ -129,7 +142,7 @@ export default async function handler(req, res) {
       }
       if (!recipe) { res.status(422).json({ error: "この動画からレシピを読み取れませんでした" }); return }
       if (!recipe.name) recipe.name = cleanText(title)
-      res.status(200).json({ recipe: { ...recipe, url: watchUrl }, source })
+      res.status(200).json({ recipe: { ...recipe, url: watchUrl }, source, via })
       return
     }
 
