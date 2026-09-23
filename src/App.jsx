@@ -7,6 +7,8 @@ import {
 // ── 定数 ──
 const TAGS = ["主菜", "副菜", "お弁当"]
 const STORE_ORDER = ["野菜・果物","肉・魚","卵・乳製品","加工食品・大豆製品","乾物・麺類・パスタ","調味料","冷凍食品・その他"]
+// URL取り込みで、AIを使わずに読めることを確認したサイト（2026-09 時点）
+const SUPPORTED_SITES = ["クラシル", "デリッシュキッチン", "Nadia", "レタスクラブ", "味の素パーク", "みんなのきょうの料理", "E・レシピ", "楽天レシピ", "macaroni", "白ごはん.com", "リュウジのバズレシピ.com"]
 
 // ── 分数・数値変換 ──
 function parseAmount(val) {
@@ -110,7 +112,7 @@ const CATEGORY_RULES = [
   { category: "卵・乳製品", keywords: ["卵", "牛乳", "チーズ", "バター", "生クリーム", "ヨーグルト"] },
   { category: "加工食品・大豆製品", keywords: ["豆腐", "納豆", "油揚げ", "厚揚げ", "こんにゃく", "しらたき", "はんぺん", "缶", "トマト缶", "ツナ缶", "キムチ"] },
   { category: "乾物・麺類・パスタ", keywords: ["パスタ", "スパゲッティ", "うどん", "そば", "そうめん", "ラーメン", "中華麺", "米", "もち", "わかめ", "のり", "かつお節", "ひじき", "春雨", "パン粉", "ごま"] },
-  { category: "調味料", keywords: ["醤油", "味噌", "みりん", "酒", "砂糖", "塩", "酢", "油", "ごま油", "ケチャップ", "マヨネーズ", "片栗粉", "小麦粉", "こしょう", "コンソメ", "だし", "鶏ガラ", "ソース", "ポン酢", "めんつゆ", "オイスターソース", "豆板醤", "コチュジャン", "カレー粉", "カレールウ"] },
+  { category: "調味料", keywords: ["醤油", "しょうゆ", "しょう油", "味噌", "みそ", "みりん", "酒", "砂糖", "塩", "酢", "油", "ごま油", "オイル", "ケチャップ", "マヨネーズ", "片栗粉", "小麦粉", "薄力粉", "こしょう", "コショウ", "胡椒", "コンソメ", "だし", "鶏ガラ", "ソース", "ポン酢", "つゆ", "めんつゆ", "オイスターソース", "豆板醤", "コチュジャン", "テンメンジャン", "カレー粉", "カレールウ", "ルウ", "味の素", "ナツメグ", "スパイス", "シナモン", "ラー油", "タバスコ", "わさび", "からし", "マスタード", "はちみつ", "ナンプラー", "ドレッシング", "チューブ", "調味料"] },
   { category: "冷凍食品・その他", keywords: ["冷凍", "アイス"], prefixes: ["冷凍"] },
 ]
 
@@ -1477,7 +1479,7 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
         const isSeasoning = i.isSeasoning ?? inferred === "調味料"
         // 水は買い物リストに載せない
         const type = isSeasoning || /^(水|お湯|湯|熱湯|氷)$/.test(i.name) ? "調味料" : "通常食材"
-        return { name: i.name, amount: i.amount, unit: i.unit, type, category: inferred || (type === "調味料" ? "調味料" : "野菜・果物"), _catAuto: true }
+        return { name: i.name, amount: i.amount, unit: i.unit, type, category: inferred || (type === "調味料" ? "調味料" : "冷凍食品・その他"), _catAuto: true }
       })
       setForm(f => ({
         ...f,
@@ -1490,7 +1492,7 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
       }))
       const counts = `材料${ingredients.length}件・手順${r.steps.length}件`
       if (data.warning) setImportMsg({ type: "warn", text: `${counts}を取り込みました。${data.warning}` })
-      else setImportMsg({ type: "ok", text: data.source === "jsonld" || data.source === "cookpad"
+      else setImportMsg({ type: "ok", text: !String(data.source || "").startsWith("ai")
         ? `✓ サイトのレシピ情報から取り込みました（${counts}）`
         : `✓ AIで読み取りました（${counts}）。分量と手順を確認してから保存してください` })
       if (text) setImportText(""); else setImportUrl("")
@@ -1535,6 +1537,19 @@ function RegisterSheet({ recipe, userId, onSave, onClose }) {
                 </>
               )}
               {importing && importMode === "url" && <div style={{ fontSize: 11, color: "#b8542a", marginTop: 6 }}>動画の場合は数十秒かかることがあります</div>}
+              {!importing && !importMsg && (importMode === "url" ? (
+                <details style={{ marginTop: 8, fontSize: 11, color: "#66776d", lineHeight: 1.7 }}>
+                  <summary style={{ cursor: "pointer", color: "#b8542a", fontWeight: 700 }}>取り込めるサイト</summary>
+                  <div style={{ marginTop: 4 }}>
+                    <div><b>AIなしで取り込める</b>：{SUPPORTED_SITES.join("・")}</div>
+                    <div><b>YouTube</b>：概要欄に材料と作り方が書かれている動画（リュウジさんなど）はAIなし。書かれていなければAIで読み取り</div>
+                    <div><b>そのほかのサイト</b>：本文に「材料」「作り方」があればAIなし、なければAIで読み取り</div>
+                    <div><b>クックパッド</b>：見えている部分だけ取り込み。全部取り込むときはアプリでコピーして「文章から」へ</div>
+                  </div>
+                </details>
+              ) : (
+                <div style={{ marginTop: 6, fontSize: 11, color: "#66776d", lineHeight: 1.6 }}>「材料」と「作り方」が書かれた文章ならAIなしで読み取ります（リュウジさんの概要欄・アプリのレシピなど）。形が崩れているときはAIで読み取ります。</div>
+              ))}
               {importMsg && (importMsg.type === "error"
                 ? <div className="error-msg">⚠️ {importMsg.text}</div>
                 : <div style={{ fontSize: 12, color: importMsg.type === "warn" ? "#8a6000" : "#2e6b4f", background: importMsg.type === "warn" ? "#fff3d6" : "transparent", borderRadius: 8, padding: importMsg.type === "warn" ? "8px 10px" : 0, marginTop: 6, lineHeight: 1.6 }}>

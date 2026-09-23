@@ -1,12 +1,12 @@
 // POST /api/import { url } → レシピの下書きを返す
 // 1. レシピサイト：ページ内の schema.org Recipe（JSON-LD）を読む（AI不使用・無料）
-// 2. YouTube：概要欄を Gemini で整理。概要欄にレシピがなければ動画そのものを Gemini に見せる
-// 3. JSON-LD がないサイト：本文テキストを Gemini で整理（クックパッドは HTML から直接読む）
-// POST /api/import { text } → 貼り付けたレシピ文章を Gemini で整理
+// 2. YouTube：概要欄をまず AI なしで読み、ダメなら Gemini。概要欄にレシピがなければ動画そのものを Gemini に見せる
+// 3. JSON-LD がないサイト：本文の「材料」「作り方」を AI なしで読み、ダメなら Gemini（クックパッド・バズレシピ.com は専用処理）
+// POST /api/import { text } → 貼り付けたレシピ文章をまず AI なしで読み、ダメなら Gemini
 import { lookup } from "node:dns/promises"
 import net from "node:net"
 import {
-  extractJsonLdRecipe, extractCookpadRecipe, htmlToText, getYouTubeId, geminiExtract, cleanText,
+  extractJsonLdRecipe, extractCookpadRecipe, extractBazurecipe, parsePlainRecipe, htmlToText, getYouTubeId, geminiExtract, cleanText,
 } from "./_recipe.js"
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -99,6 +99,9 @@ export default async function handler(req, res) {
   try {
     // 貼り付けテキスト
     if (pasted) {
+      // まずは AI なしで読む（「材料」「作り方」がある文章ならこれで足りる）
+      const plain = parsePlainRecipe(pasted)
+      if (plain) { res.status(200).json({ recipe: { ...plain, url: url || "" }, source: "text" }); return }
       if (!apiKey) return noKey()
       const recipe = await geminiExtract({ apiKey, model, text: `貼り付けられたレシピ:\n${pasted.slice(0, 15000)}` })
       if (!recipe) { res.status(422).json({ error: "文章からレシピを読み取れませんでした", debug: geminiExtract.lastDebug }); return }
@@ -108,9 +111,12 @@ export default async function handler(req, res) {
 
     const videoId = getYouTubeId(url)
     if (videoId) {
-      if (!apiKey) return noKey()
       const watchUrl = `https://www.youtube.com/watch?v=${videoId}`
       const { title, description } = await fetchYouTubeInfo(videoId)
+      // 概要欄に「材料…分量」の形で書かれていれば AI なしで読める
+      const plain = description ? parsePlainRecipe(description, title) : null
+      if (plain) { res.status(200).json({ recipe: { ...plain, url: watchUrl }, source: "youtube-text" }); return }
+      if (!apiKey) return noKey()
       let recipe = null
       if (description.trim()) {
         recipe = await geminiExtract({ apiKey, model, text: `動画タイトル: ${title}\n\n概要欄:\n${description}` })
@@ -139,13 +145,20 @@ export default async function handler(req, res) {
         return
       }
     }
+    if (/(^|\.)bazurecipe\.com$/.test(new URL(url).hostname)) {
+      const bz = extractBazurecipe(html)
+      if (bz) { res.status(200).json({ recipe: { ...bz, url }, source: "bazurecipe" }); return }
+    }
     const fromLd = extractJsonLdRecipe(html)
     if (fromLd && fromLd.ingredients.length) {
       res.status(200).json({ recipe: { ...fromLd, url }, source: "jsonld" })
       return
     }
-    if (!apiKey) return noKey()
+    // 本文に「材料」「作り方」がテキストで書かれていれば AI なしで読む
     const title = cleanText((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "")
+    const plain = parsePlainRecipe(htmlToText(html, 60000), title.split(/\s+[-|｜]\s+/)[0], { preferTitle: true })
+    if (plain) { res.status(200).json({ recipe: { ...plain, url }, source: "text" }); return }
+    if (!apiKey) return noKey()
     const recipe = await geminiExtract({ apiKey, model, text: `ページタイトル: ${title}\n\n本文:\n${htmlToText(html)}` })
     if (!recipe) { res.status(422).json({ error: "このページからレシピを読み取れませんでした" }); return }
     res.status(200).json({ recipe: { ...recipe, url }, source: "ai-page" })
