@@ -107,7 +107,8 @@ function normalizeUnit(amount, unit) {
   return { amount, unit }
 }
 
-const round1 = n => Math.round(n * 10) / 10
+// 1/4個 が 0.3個 にならないよう小数第2位まで（0.25）
+const round1 = n => Math.round(n * 100) / 100
 
 // 合算した量を表示用の単位に戻す：小さじ3の倍数（0.5刻み）なら大さじ、それ以外は小さじ
 function displayQty(amount, unit) {
@@ -415,6 +416,7 @@ const SAMPLE_RECIPES = [
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700;900&family=Zen+Maru+Gothic:wght@500;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 body{background:#f6f2e9;}
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-thumb{background:#d3cfc2;border-radius:2px;}
@@ -1025,6 +1027,13 @@ export default function App() {
 
   const toggleSeasoningCheck = name => {
     const next = { ...seasoningChecks, [name]: !seasoningChecks[name] }
+    // 買い物リストで ✕ 削除済みだった名前は、チェックし直したら戻す
+    if (next[name] && deletedItems.has(name)) {
+      const restored = new Set([...deletedItems].filter(n => n !== name))
+      setSeasoningChecks(next); setDeletedItems(restored)
+      triggerSave(buildSave({ seasoningChecks: next, deletedItems: [...restored] }))
+      return
+    }
     setSeasoningChecks(next); triggerSave(buildSave({ seasoningChecks: next }))
   }
 
@@ -1082,6 +1091,12 @@ export default function App() {
     const next = new Set([...deletedItems, name])
     setDeletedItems(next); triggerSave(buildSave({ deletedItems: [...next] }))
   }
+  const restoreShoppingItem = name => {
+    const next = new Set([...deletedItems].filter(n => n !== name))
+    setDeletedItems(next); triggerSave(buildSave({ deletedItems: [...next] }))
+  }
+  // ✕ で消した項目のうち、今の献立・手入力にあるもの（下に「戻す」で表示）
+  const hiddenShoppingNames = useMemo(() => [...new Set(baseShoppingList.filter(i => deletedItems.has(i.name)).map(i => i.name))], [baseShoppingList, deletedItems])
 
   // ── チェック（リアルタイム同期） ──
   const toggleCheck = async (name) => {
@@ -1097,8 +1112,19 @@ export default function App() {
   const addManualItem = () => {
     const trimmed = addManualInput.trim()
     if (!trimmed) return
+    // ✕ で削除した名前をもう一度入れたら、削除を取り消してリストに戻す
+    if (deletedItems.has(trimmed)) {
+      const restored = new Set([...deletedItems].filter(n => n !== trimmed))
+      const exists = manualItems.some(m => m.name === trimmed) || baseShoppingList.some(i => i.name === trimmed)
+      const nextManual = exists ? manualItems : [...manualItems, { id: Date.now(), name: trimmed, amount: 1, unit: "個", type: "通常食材", category: inferCategory(trimmed) || "冷凍食品・その他" }]
+      setDeletedItems(restored); setManualItems(nextManual)
+      triggerSave(buildSave({ deletedItems: [...restored], manualItems: nextManual }))
+      setAddManualInput(""); showToast("リストに戻しました")
+      return
+    }
     if (manualItems.find(m => m.name === trimmed)) { showToast("同じ名前のアイテムがあります", "warn"); return }
-    const newItem = { id: Date.now(), name: trimmed, amount: 1, unit: "個", type: "通常食材", category: "冷凍食品・その他" }
+    if (baseShoppingList.some(i => i.name === trimmed)) { showToast("すでにリストにあります", "warn"); return }
+    const newItem = { id: Date.now(), name: trimmed, amount: 1, unit: "個", type: "通常食材", category: inferCategory(trimmed) || "冷凍食品・その他" }
     const next = [...manualItems, newItem]
     setManualItems(next); triggerSave(buildSave({ manualItems: next }))
     setAddManualInput("")
@@ -1411,7 +1437,7 @@ export default function App() {
               {allSeasonings.map(s => (
                 <div key={s.name} className="check-row" onClick={() => toggleSeasoningCheck(s.name)}>
                   <div className={`custom-check ${seasoningChecks[s.name] ? "checked" : ""}`}>{seasoningChecks[s.name] ? "✓" : ""}</div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</div>
                     <div style={{ fontSize: 11, color: "#7f8e85", marginTop: 2 }}>合計 <strong>{s.amountLabel}</strong></div>
                     <RecipeBreakdown list={s.byRecipe} />
@@ -1472,7 +1498,7 @@ export default function App() {
                         {(moveChecked ? [...unchecked, ...checked] : allItems).map(item => {
                           const isChecked = checkedItems.includes(item.name)
                           return (
-                            <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f6f2e9" : "#fff" }}>
+                            <div key={`${item.isSeasoning ? "s" : item.isManual ? "m" : "i"}-${item.name}`} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f6f2e9" : "#fff" }}>
                               <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#2e5d4e" : "#d3cfc2"}`, background: isChecked ? "#2e5d4e" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
                                 {isChecked ? "✓" : ""}
                               </div>
@@ -1515,6 +1541,16 @@ export default function App() {
                   )
                 })}
                 {checkedItems.length > 0 && <div style={{ textAlign: "center", padding: "8px", fontSize: 12, color: "#66776d" }}>{checkedItems.length}品チェック済み</div>}
+                {hiddenShoppingNames.length > 0 && (
+                  <div style={{ marginTop: 8, marginBottom: 14 }}>
+                    <div className="section-head">削除したもの（✕で消した項目）</div>
+                    <div className="card" style={{ padding: "8px 12px", display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {hiddenShoppingNames.map(name => (
+                        <button key={name} className="pill-btn" style={{ fontSize: 12, padding: "5px 12px" }} onClick={() => restoreShoppingItem(name)}>↩ {name}を戻す</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -2049,7 +2085,8 @@ function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
       const r = data.recipe
       const ingredients = r.ingredients.map(i => {
         const inferred = inferCategory(i.name)
-        const isSeasoning = i.isSeasoning ?? inferred === "調味料"
+        // 売り場カテゴリが分かる食材はそれを優先（AI がレモン等を調味料扱いすることがあるため）
+        const isSeasoning = inferred ? inferred === "調味料" : !!i.isSeasoning
         // 水は買い物リストに載せない
         const type = isSeasoning || /^(水|お湯|湯|熱湯|氷)$/.test(i.name) ? "調味料" : "通常食材"
         return { name: i.name, amount: i.amount, unit: i.unit, type, category: inferred || (type === "調味料" ? "調味料" : "冷凍食品・その他"), _catAuto: true }
