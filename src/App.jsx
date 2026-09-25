@@ -70,13 +70,37 @@ function parseAmount(val) {
   return isNaN(num) ? 0 : num
 }
 
-const TO_ML = { "大さじ": 15, "小さじ": 5, "カップ": 200, "ml": 1, "cc": 1, "l": 1000 }
+// 合算用の単位：大さじ・小さじは「小さじ」、カップ・ml・cc・L は「ml」、kg・g は「g」にそろえる
+// （大さじ・小さじを ml にすると「小さじ1.5」が「7.5ml」になって分かりにくいので分けている）
+const TO_TSP = { "大さじ": 3, "小さじ": 1 }
+const TO_ML = { "カップ": 200, "ml": 1, "cc": 1, "l": 1000, "L": 1000 }
 const TO_G  = { "kg": 1000, "g": 1 }
 
 function normalizeUnit(amount, unit) {
+  if (TO_TSP[unit]) return { amount: amount * TO_TSP[unit], unit: "小さじ" }
   if (TO_ML[unit]) return { amount: amount * TO_ML[unit], unit: "ml" }
   if (TO_G[unit])  return { amount: amount * TO_G[unit], unit: "g" }
   return { amount, unit }
+}
+
+const round1 = n => Math.round(n * 10) / 10
+
+// 合算した量を表示用の単位に戻す：小さじ3の倍数（0.5刻み）なら大さじ、それ以外は小さじ
+function displayQty(amount, unit) {
+  if (unit === "小さじ" && amount >= 3) {
+    const tbsp = amount / 3
+    if (Math.abs(tbsp * 2 - Math.round(tbsp * 2)) < 1e-6) return { amount: round1(tbsp), unit: "大さじ" }
+  }
+  return { amount: round1(amount), unit }
+}
+
+// 「小さじ1」「大さじ1/2」「300g」「2個」「少々」の形で表示する
+const VAGUE_UNITS = ["少々", "適量", "適宜", "ひとつまみ", "少量", "お好みで", "お好み", "各適量", "各少々"]
+function formatQty(amount, unit) {
+  const u = unit || ""
+  const empty = amount === "" || amount === null || amount === undefined || (Number(amount) === 0 && VAGUE_UNITS.includes(u))
+  if (empty) return u
+  return ["大さじ", "小さじ", "カップ"].includes(u) ? `${u}${amount}` : `${amount}${u}`
 }
 
 // ── 表記ゆれ吸収 ──
@@ -170,7 +194,8 @@ function mergeIngredientsAdvanced(selections, recipes) {
     })
   })
   return Object.values(map).map(i => {
-    const parts = Object.values(i.parts).map(p => ({ ...p, amount: Math.round(p.amount * 10) / 10 }))
+    // baseUnit は合算用の単位（数量調整のキーに使う）、unit は表示用（小さじ→大さじ など）
+    const parts = Object.values(i.parts).map(p => ({ ...p, baseUnit: p.unit, ...displayQty(p.amount, p.unit) }))
     return { ...i, parts, mixed: parts.length > 1, amount: parts[0].amount, unit: parts[0].unit }
   })
 }
@@ -225,12 +250,17 @@ function mergeSeasonings(selections, recipes) {
     if (!r) return
     r.ingredients.filter(i => i.type === "調味料").forEach(ing => {
       const key = ingredientKey(ing.name)
-      if (!map[key]) map[key] = { ...ing, name: normalizeIngredientName(ing.name), totalAmount: 0, recipes: [] }
-      map[key].totalAmount += (parseAmount(ing.amount) || 0) * sel.portion
+      if (!map[key]) map[key] = { ...ing, name: normalizeIngredientName(ing.name), units: {}, recipes: [] }
+      // 単位をそろえて合算（大さじ＋小さじ は小さじで足す。g と大さじのように換算できないものは別々に）
+      const { amount, unit } = normalizeUnit((parseAmount(ing.amount) || 0) * sel.portion, ing.unit || "")
+      map[key].units[unit] = (map[key].units[unit] || 0) + amount
       if (!map[key].recipes.includes(r.name)) map[key].recipes.push(r.name)
     })
   })
-  return Object.values(map)
+  return Object.values(map).map(({ units, ...s }) => {
+    const parts = Object.entries(units).map(([u, a]) => displayQty(a, u))
+    return { ...s, parts, amount: parts[0].amount, unit: parts[0].unit, amountLabel: parts.map(p => formatQty(p.amount, p.unit)).join(" ＋ ") }
+  })
 }
 
 // ── ユーティリティ ──
@@ -566,12 +596,12 @@ function RecipeDetailSheet({ recipe, tagDefs, onClose, onEdit, onDelete }) {
         {activeTab === "ingredients" && <div style={{ padding: "20px 16px" }}>
           <div style={{ fontSize: 12, color: "#8f9d94", marginBottom: 14 }}>基本 {recipe.servings || 2}人前</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-            {recipe.ingredients.filter(i => i.type === "通常食材").map((ing, i) => <div key={i} className="ing-chip"><span>{ing.name}</span><span className="ing-amount">{ing.amount}{ing.unit}</span></div>)}
+            {recipe.ingredients.filter(i => i.type === "通常食材").map((ing, i) => <div key={i} className="ing-chip"><span>{ing.name}</span><span className="ing-amount">{formatQty(ing.amount, ing.unit)}</span></div>)}
           </div>
           {recipe.ingredients.some(i => i.type === "調味料") && <>
             <div style={{ fontSize: 12, color: "#8f9d94", marginBottom: 10, fontWeight: 700 }}>調味料</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {recipe.ingredients.filter(i => i.type === "調味料").map((ing, i) => <div key={i} className="ing-chip" style={{ background: "#f5f0fa", borderColor: "#d8cce8" }}><span>{ing.name}</span><span className="ing-amount" style={{ color: "#6a3fa0" }}>{ing.amount}{ing.unit}</span></div>)}
+              {recipe.ingredients.filter(i => i.type === "調味料").map((ing, i) => <div key={i} className="ing-chip" style={{ background: "#f5f0fa", borderColor: "#d8cce8" }}><span>{ing.name}</span><span className="ing-amount" style={{ color: "#6a3fa0" }}>{formatQty(ing.amount, ing.unit)}</span></div>)}
             </div>
           </>}
         </div>}
@@ -960,27 +990,29 @@ export default function App() {
   const baseShoppingList = useMemo(() => {
     const merged = mergeIngredientsAdvanced(allActiveSels, recipes)
     const seasonings = allSeasonings.filter(s => seasoningChecks[s.name]).map(s => ({
-      ...s, amount: Math.round(s.totalAmount * 10) / 10, isSeasoning: true
+      ...s, isSeasoning: true
     }))
     const manual = manualItems.map(m => ({ ...m, isManual: true, category: m.category || "冷凍食品・その他" }))
     return [...merged, ...seasonings, ...manual]
   }, [allActiveSels, recipes, seasoningChecks, allSeasonings, manualItems])
 
-  // 数量調整は「レシピの量からの増減」{ delta } で持つ。レシピや献立が変わっても量が追従する
-  // （以前の形式＝調整後の数値そのものは、元の量が分からず古い値が残るため使わない）
-  const applyAdjust = (base, adj) => {
+  // 数量調整は「レシピの量からの増減」{ delta, unit } で持つ。レシピや献立が変わっても量が追従する
+  // （以前の形式＝調整後の数値そのものは、元の量が分からず古い値が残るため使わない。
+  //   表示単位が変わった（小さじ⇔大さじ など）ときも、増減の意味が変わるので使わない）
+  const applyAdjust = (base, adj, unit) => {
     const b = parseAmount(base) || 0
     if (!adj || typeof adj !== "object" || typeof adj.delta !== "number" || !adj.delta) return { displayAmount: b, adjusted: false }
+    if (adj.unit !== undefined && adj.unit !== unit) return { displayAmount: b, adjusted: false }
     return { displayAmount: Math.max(0, Math.round((b + adj.delta) * 10) / 10), adjusted: true }
   }
   const shoppingList = useMemo(() => baseShoppingList
     .filter(i => !deletedItems.has(i.name))
     .map(i => ({
       ...i,
-      ...(i.isSeasoning ? { displayAmount: i.amount, adjusted: false } : applyAdjust(i.amount, shoppingAdjust[i.name])),
+      ...(i.isSeasoning ? { displayAmount: i.amount, adjusted: false } : applyAdjust(i.amount, shoppingAdjust[i.name], i.unit)),
       parts: i.mixed ? i.parts.map(p => {
-        const key = adjustKey(i.name, p.unit, true)
-        return { ...p, key, ...applyAdjust(p.amount, shoppingAdjust[key]) }
+        const key = adjustKey(i.name, p.baseUnit || p.unit, true)
+        return { ...p, key, ...applyAdjust(p.amount, shoppingAdjust[key], p.unit) }
       }) : i.parts,
     }))
     .sort((a, b) => { const ai = STORE_ORDER.indexOf(a.category), bi = STORE_ORDER.indexOf(b.category); return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) })
@@ -988,16 +1020,15 @@ export default function App() {
 
   // key は adjustKey() の値。base は調整前の数量
   const adjustShopping = (key, delta, unit, base) => {
-    // g・ml系は10刻み、それ以外（個・本・缶・人前・枚 etc）は1刻み
-    const bigStep = ["g","ml","cc"].includes(unit)
-    const step = bigStep ? 10 : 1
+    // g・ml系は10刻み、大さじ・小さじは0.5刻み、それ以外（個・本・缶・人前・枚 etc）は1刻み
+    const step = ["g", "ml", "cc"].includes(unit) ? 10 : ["大さじ", "小さじ"].includes(unit) ? 0.5 : 1
     const b = parseAmount(base) || 0
-    const cur = applyAdjust(base, shoppingAdjust[key]).displayAmount
+    const cur = applyAdjust(base, shoppingAdjust[key], unit).displayAmount
     const nextAmount = Math.max(0, Math.round((cur + delta * step) * 10) / 10)
     const nextDelta = Math.round((nextAmount - b) * 10) / 10
     // 以前の形式（数値）の調整は捨て、増減が0なら記録しない
     const next = Object.fromEntries(Object.entries(shoppingAdjust).filter(([k, v]) => k !== key && v && typeof v === "object"))
-    if (nextDelta) next[key] = { delta: nextDelta }
+    if (nextDelta) next[key] = { delta: nextDelta, unit }
     setShoppingAdjust(next); triggerSave(buildSave({ shoppingAdjust: next }))
   }
   const resetAdjust = key => {
@@ -1340,7 +1371,7 @@ export default function App() {
                   <div className={`custom-check ${seasoningChecks[s.name] ? "checked" : ""}`}>{seasoningChecks[s.name] ? "✓" : ""}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: "#7f8e85", marginTop: 2 }}>合計 <strong>{Math.round(s.totalAmount * 10) / 10}{s.unit}</strong>　{s.recipes.join("・")}</div>
+                    <div style={{ fontSize: 11, color: "#7f8e85", marginTop: 2 }}>合計 <strong>{s.amountLabel}</strong>　{s.recipes.join("・")}</div>
                   </div>
                   {seasoningChecks[s.name] && <span style={{ fontSize: 11, color: "#c0391b", fontWeight: 700, flexShrink: 0 }}>リストへ追加</span>}
                 </div>
@@ -1407,17 +1438,17 @@ export default function App() {
                                 {item.isSeasoning && <span style={{ fontSize: 10, color: "#7f8e85" }}>調味料（買い足し）</span>}
                                 {item.isManual && <span style={{ fontSize: 10, color: "#5a8aa0" }}>手動追加</span>}
                                 {!item.mixed && item.adjusted && (
-                                  <button className="adjust-hint" onClick={() => resetAdjust(item.name)}>{item.isManual ? "最初は" : "レシピでは"}{item.amount}{item.unit}・元に戻す</button>
+                                  <button className="adjust-hint" onClick={() => resetAdjust(item.name)}>{item.isManual ? "最初は" : "レシピでは"}{formatQty(item.amount, item.unit)}・元に戻す</button>
                                 )}
                                 {/* 単位が異なる同名食材：内訳ごとに数量調整 */}
                                 {item.mixed && <>
-                                  <div style={{ fontSize: 12, fontWeight: 700, color: "#2e5d4e", marginTop: 2 }}>{item.parts.map(p => `${p.displayAmount}${p.unit}`).join(" ＋ ")}</div>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: "#2e5d4e", marginTop: 2 }}>{item.parts.map(p => formatQty(p.displayAmount, p.unit)).join(" ＋ ")}</div>
                                   {item.parts.map(p => (
                                     <div key={p.unit} className="part-row">
-                                      <span className="part-label">└ {p.recipes.join("・")}{p.adjusted && <button className="adjust-hint" style={{ marginLeft: 4 }} onClick={() => resetAdjust(p.key)}>元は{p.amount}{p.unit}・戻す</button>}</span>
+                                      <span className="part-label">└ {p.recipes.join("・")}{p.adjusted && <button className="adjust-hint" style={{ marginLeft: 4 }} onClick={() => resetAdjust(p.key)}>元は{formatQty(p.amount, p.unit)}・戻す</button>}</span>
                                       <div className="num-ctrl">
                                         <button className="num-btn sm" onClick={() => adjustShopping(p.key, -1, p.unit, p.amount)}>−</button>
-                                        <span style={{ minWidth: 48, textAlign: "center", fontSize: 12, fontWeight: 700 }}>{p.displayAmount}{p.unit}</span>
+                                        <span style={{ minWidth: 48, textAlign: "center", fontSize: 12, fontWeight: 700 }}>{formatQty(p.displayAmount, p.unit)}</span>
                                         <button className="num-btn sm" onClick={() => adjustShopping(p.key, 1, p.unit, p.amount)}>＋</button>
                                       </div>
                                     </div>
@@ -1427,10 +1458,10 @@ export default function App() {
                               {item.mixed ? null : !item.isSeasoning
                                 ? <div className="num-ctrl">
                                     <button className="num-btn" onClick={() => adjustShopping(item.name, -1, item.unit, item.amount)}>−</button>
-                                    <span style={{ minWidth: 60, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{item.displayAmount}{item.unit}</span>
+                                    <span style={{ minWidth: 60, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{formatQty(item.displayAmount, item.unit)}</span>
                                     <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit, item.amount)}>＋</button>
                                   </div>
-                                : <span style={{ fontSize: 13, color: "#66776d" }}>{item.amount}{item.unit}</span>}
+                                : <span style={{ fontSize: 13, color: "#66776d" }}>{item.amountLabel || formatQty(item.amount, item.unit)}</span>}
                               <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => item.isManual ? removeManualItem(item.name) : removeShoppingItem(item.name)}>✕</button>
                             </div>
                           )
