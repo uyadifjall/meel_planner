@@ -39,6 +39,17 @@ function resolveTagDefs(saved, recipes) {
   return defs
 }
 
+// 「└ レシピ名 量」の内訳。使うレシピが1つなら量は合計と同じなので名前だけ出す
+function RecipeBreakdown({ list }) {
+  if (!list || !list.length) return null
+  const single = list.length === 1
+  return (
+    <div className="breakdown">
+      {list.map(b => <div key={b.recipe} className="bd-line"><span className="bd-name">└ {b.recipe}</span>{!single && b.label && <span className="breakdown-amt">{b.label}</span>}</div>)}
+    </div>
+  )
+}
+
 function TagChip({ name, defs, small }) {
   const c = TAG_COLORS[defs?.find(d => d.name === name)?.color] || TAG_COLORS.gray
   return <span className="tag" style={{ background: c.bg, color: c.fg, ...(small ? { fontSize: 10, padding: "2px 8px" } : {}) }}>{name}</span>
@@ -188,15 +199,22 @@ function mergeIngredientsAdvanced(selections, recipes) {
       const key = ingredientKey(ing.name)
       if (!map[key]) map[key] = { ...ing, name: normalizeIngredientName(ing.name), parts: {} }
       const parts = map[key].parts
-      if (!parts[unit]) parts[unit] = { unit, amount: 0, recipes: [] }
+      if (!parts[unit]) parts[unit] = { unit, amount: 0, recipes: [], perRecipe: {} }
       parts[unit].amount += amount
       if (!parts[unit].recipes.includes(recipe.name)) parts[unit].recipes.push(recipe.name)
+      // 同じレシピが別の日にもあれば合計する
+      parts[unit].perRecipe[recipe.name] = (parts[unit].perRecipe[recipe.name] || 0) + amount
     })
   })
   return Object.values(map).map(i => {
     // baseUnit は合算用の単位（数量調整のキーに使う）、unit は表示用（小さじ→大さじ など）
-    const parts = Object.values(i.parts).map(p => ({ ...p, baseUnit: p.unit, ...displayQty(p.amount, p.unit) }))
-    return { ...i, parts, mixed: parts.length > 1, amount: parts[0].amount, unit: parts[0].unit }
+    const parts = Object.values(i.parts).map(({ perRecipe, ...p }) => ({
+      ...p, baseUnit: p.unit, ...displayQty(p.amount, p.unit),
+      byRecipe: Object.entries(perRecipe).map(([recipe, a]) => { const q = displayQty(a, p.unit); return { recipe, label: formatQty(q.amount, q.unit) } }),
+    }))
+    // 単位が1つのときの「レシピごとの量」
+    const byRecipe = parts.length === 1 ? parts[0].byRecipe : []
+    return { ...i, parts, byRecipe, mixed: parts.length > 1, amount: parts[0].amount, unit: parts[0].unit }
   })
 }
 
@@ -255,11 +273,15 @@ function mergeSeasonings(selections, recipes) {
       const { amount, unit } = normalizeUnit((parseAmount(ing.amount) || 0) * sel.portion, ing.unit || "")
       map[key].units[unit] = (map[key].units[unit] || 0) + amount
       if (!map[key].recipes.includes(r.name)) map[key].recipes.push(r.name)
+      const per = (map[key].perRecipe ||= {})[r.name] ||= {}
+      per[unit] = (per[unit] || 0) + amount
     })
   })
-  return Object.values(map).map(({ units, ...s }) => {
+  const label = units => Object.entries(units).map(([u, a]) => { const q = displayQty(a, u); return formatQty(q.amount, q.unit) }).join(" ＋ ")
+  return Object.values(map).map(({ units, perRecipe = {}, ...s }) => {
     const parts = Object.entries(units).map(([u, a]) => displayQty(a, u))
-    return { ...s, parts, amount: parts[0].amount, unit: parts[0].unit, amountLabel: parts.map(p => formatQty(p.amount, p.unit)).join(" ＋ ") }
+    const byRecipe = Object.entries(perRecipe).map(([recipe, us]) => ({ recipe, label: label(us) }))
+    return { ...s, parts, byRecipe, amount: parts[0].amount, unit: parts[0].unit, amountLabel: label(units) }
   })
 }
 
@@ -456,7 +478,11 @@ input[type=date]{cursor:pointer;}
 .switch-track.on{background:#2e5d4e;}
 .switch-track.on::after{left:16px;}
 .part-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
-.part-label{flex:1;font-size:11px;color:#7f8e85;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.part-label{flex:1;font-size:11px;color:#7f8e85;min-width:0;line-height:1.5;}
+.breakdown{font-size:11px;color:#7f8e85;margin-top:3px;line-height:1.55;}
+.breakdown-amt{color:#2e5d4e;font-weight:700;margin-left:6px;white-space:nowrap;flex-shrink:0;}
+.bd-line{display:flex;align-items:baseline;min-width:0;}
+.bd-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .num-btn.sm{width:24px;height:24px;font-size:14px;}
 .adjust-hint{display:block;border:none;background:none;padding:2px 0 0;font-family:inherit;font-size:10px;color:#b8542a;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
 .part-label .adjust-hint{display:inline;}
@@ -1371,7 +1397,8 @@ export default function App() {
                   <div className={`custom-check ${seasoningChecks[s.name] ? "checked" : ""}`}>{seasoningChecks[s.name] ? "✓" : ""}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: "#7f8e85", marginTop: 2 }}>合計 <strong>{s.amountLabel}</strong>　{s.recipes.join("・")}</div>
+                    <div style={{ fontSize: 11, color: "#7f8e85", marginTop: 2 }}>合計 <strong>{s.amountLabel}</strong></div>
+                    <RecipeBreakdown list={s.byRecipe} />
                   </div>
                   {seasoningChecks[s.name] && <span style={{ fontSize: 11, color: "#c0391b", fontWeight: 700, flexShrink: 0 }}>リストへ追加</span>}
                 </div>
@@ -1437,6 +1464,7 @@ export default function App() {
                                 <div style={{ fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
                                 {item.isSeasoning && <span style={{ fontSize: 10, color: "#7f8e85" }}>調味料（買い足し）</span>}
                                 {item.isManual && <span style={{ fontSize: 10, color: "#5a8aa0" }}>手動追加</span>}
+                                {!item.mixed && <RecipeBreakdown list={item.byRecipe} />}
                                 {!item.mixed && item.adjusted && (
                                   <button className="adjust-hint" onClick={() => resetAdjust(item.name)}>{item.isManual ? "最初は" : "レシピでは"}{formatQty(item.amount, item.unit)}・元に戻す</button>
                                 )}
@@ -1445,7 +1473,7 @@ export default function App() {
                                   <div style={{ fontSize: 12, fontWeight: 700, color: "#2e5d4e", marginTop: 2 }}>{item.parts.map(p => formatQty(p.displayAmount, p.unit)).join(" ＋ ")}</div>
                                   {item.parts.map(p => (
                                     <div key={p.unit} className="part-row">
-                                      <span className="part-label">└ {p.recipes.join("・")}{p.adjusted && <button className="adjust-hint" style={{ marginLeft: 4 }} onClick={() => resetAdjust(p.key)}>元は{formatQty(p.amount, p.unit)}・戻す</button>}</span>
+                                      <span className="part-label">{p.byRecipe.map(b => <div key={b.recipe} className="bd-line"><span className="bd-name">└ {b.recipe}</span>{p.byRecipe.length > 1 && <span className="breakdown-amt">{b.label}</span>}</div>)}{p.adjusted && <button className="adjust-hint" style={{ marginLeft: 4 }} onClick={() => resetAdjust(p.key)}>元は{formatQty(p.amount, p.unit)}・戻す</button>}</span>
                                       <div className="num-ctrl">
                                         <button className="num-btn sm" onClick={() => adjustShopping(p.key, -1, p.unit, p.amount)}>−</button>
                                         <span style={{ minWidth: 48, textAlign: "center", fontSize: 12, fontWeight: 700 }}>{formatQty(p.displayAmount, p.unit)}</span>
