@@ -79,50 +79,77 @@ function normalizeUnit(amount, unit) {
   return { amount, unit }
 }
 
-// ── 表記ゆれ吸収（ひらがな・カタカナ統一＋よくある別名辞書） ──
+// ── 表記ゆれ吸収 ──
 // カタカナ→ひらがな変換
 function katakanaToHiragana(str) {
-  return str.replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+  return str.replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60))
 }
 
-// よくある食材名の表記ゆれ辞書（読みが同じでも漢字/別名が異なるもの）
-const INGREDIENT_ALIASES = {
-  "ねぎ": "長ねぎ", "ネギ": "長ねぎ", "葱": "長ねぎ", "白ねぎ": "長ねぎ",
-  "人参": "にんじん", "ニンジン": "にんじん",
-  "玉葱": "玉ねぎ", "タマネギ": "玉ねぎ", "たまねぎ": "玉ねぎ",
-  "じゃが芋": "じゃがいも", "ジャガイモ": "じゃがいも", "馬鈴薯": "じゃがいも",
-  "豚バラ": "豚バラ肉", "豚ばら": "豚バラ肉", "ぶたばら": "豚バラ肉",
-  "鶏むね": "鶏むね肉", "鶏もも": "鶏もも肉", "とりもも": "鶏もも肉", "とりむね": "鶏むね肉",
-  "牛こま": "牛こま肉", "牛肉（薄切り）": "牛薄切り肉", "牛バラ": "牛バラ肉",
-  "しょうゆ": "醤油", "しょう油": "醤油", "正油": "醤油",
-  "味醂": "みりん", "上白糖": "砂糖", "グラニュー糖": "砂糖",
-  "片栗粉": "片栗粉", "コーンスターチ": "片栗粉",
-  "椎茸": "しいたけ", "しいたけ": "しいたけ", "シイタケ": "しいたけ",
-  "大蒜": "にんにく", "ニンニク": "にんにく", "ガーリック": "にんにく",
-  "生姜": "しょうが", "ショウガ": "しょうが", "ジンジャー": "しょうが",
-  "胡瓜": "きゅうり", "キュウリ": "きゅうり",
-  "茄子": "なす", "ナス": "なす",
-  "南瓜": "かぼちゃ", "カボチャ": "かぼちゃ",
-  "大根": "大根", "だいこん": "大根",
-  "白菜": "白菜", "はくさい": "白菜",
-  "豆腐": "豆腐", "とうふ": "豆腐",
-  "卵": "卵", "玉子": "卵", "たまご": "卵",
+// 表示用に整える：全角/半角をそろえ、（皮なし）(300g)【A】などの注記を外す
+function cleanIngredientName(name) {
+  return String(name || "").normalize("NFKC")
+    .replace(/[（(【\[「][^）)】\]」]*[）)】\]」]/g, "")
+    .replace(/\s+/g, " ").trim()
 }
 
-// 食材名を正規化（表記ゆれを統一）
+// 比較用キーを作るルール（ひらがな化したあとの文字列に上から順に適用）
+// 同じキーになった食材は、買い物リスト・調味料チェックで1つにまとめる
+const NAME_RULES = [
+  // 肉：鶏胸肉/鶏ムネ肉/とりむね → 鶏むね、鶏モモ肉/鶏腿 → 鶏もも、挽き肉/ミンチ → ひき
+  [/^(とり|鳥)/, "鶏"], [/^ぶた/, "豚"], [/^ぎゅう/, "牛"],
+  [/胸/g, "むね"], [/腿/g, "もも"], [/ささ身/g, "ささみ"],
+  [/(細切れ|小間切れ|こま切れ|こまぎれ)/g, "こま"],
+  [/(挽き|挽|びき|みんち)/g, "ひき"],
+  [/(合い|合|あい)ひき/g, "合いひき"],
+  [/(.)肉/g, "$1"], // 「鶏むね肉」と「鶏むね」を同じにする（「肉」1文字だけは残す）
+  // 卵・野菜
+  [/^(鶏卵|玉子|たまご)$/, "卵"],
+  [/^(玉葱|たまねぎ)/, "玉ねぎ"], [/人参/g, "にんじん"], [/(じゃが芋|馬鈴薯)/g, "じゃがいも"],
+  [/^(白ねぎ|白葱|長葱|葱|ねぎ)$/, "長ねぎ"], [/^(青ねぎ|青葱|万能ねぎ|小葱|細ねぎ)$/, "小ねぎ"],
+  [/生姜/g, "しょうが"], [/大蒜/g, "にんにく"], [/椎茸/g, "しいたけ"], [/胡瓜/g, "きゅうり"],
+  [/茄子/g, "なす"], [/南瓜/g, "かぼちゃ"], [/牛蒡/g, "ごぼう"], [/蓮根/g, "れんこん"],
+  [/だいこん/g, "大根"], [/はくさい/g, "白菜"], [/ほうれんそう/g, "ほうれん草"], [/とうふ/g, "豆腐"],
+  // 調味料（薄口醤油・黒こしょう・塩こしょうは別物として残す）
+  [/(薄口|うすくち|淡口)(醤油|しょう油|しょうゆ|正油)/g, "うすくちしょうゆ"],
+  [/(濃口|こいくち)?(醤油|しょう油|正油)/g, "しょうゆ"], [/^こいくちしょうゆ$/, "しょうゆ"],
+  [/(本)?味醂/g, "みりん"], [/^本みりん$/, "みりん"],
+  [/^(料理酒|日本酒|清酒)$/, "酒"],
+  [/味噌/g, "みそ"], [/胡麻/g, "ごま"], [/胡椒/g, "こしょう"],
+  [/^塩・?こしょう$/, "塩こしょう"],
+  [/^(粗ひき|あらひき)?(黒こしょう|ぶらっくぺっぱー)$/, "黒こしょう"], // 「あらびき」は上の規則で「あらひき」になっている
+  [/^さらだおいる$/, "さらだ油"],
+  [/^(上白糖|ぐらにゅー糖)$/, "砂糖"], [/^薄力粉$/, "小麦粉"],
+  [/^麺つゆ$/, "めんつゆ"], [/^とまとけちゃっぷ$/, "けちゃっぷ"], [/^(米酢|穀物酢)$/, "酢"],
+  [/^(だしの素|和風だしの素|顆粒だし|顆粒和風だし|和風顆粒だし|ほんだし)$/, "顆粒和風だし"],
+  [/^鶏がら(すーぷ)?(の素|のもと|顆粒)?$/, "鶏がらすーぷの素"],
+  [/^((すり)?おろしにんにく|にんにく(ちゅーぶ|すりおろし)|ちゅーぶ(入り)?にんにく)$/, "おろしにんにく"],
+  [/^((すり)?おろししょうが|しょうが(ちゅーぶ|すりおろし)|ちゅーぶ(入り)?しょうが)$/, "おろししょうが"],
+]
+
+// 比較用キー（同じキー＝同じ食材）
+function ingredientKey(name) {
+  let s = katakanaToHiragana(cleanIngredientName(name).replace(/[\s・]/g, "").replace(/(など|等)$/, ""))
+  for (const [re, rep] of NAME_RULES) s = s.replace(re, rep)
+  return s
+}
+
+// よく使う食材の表示名（キーが一致したらこの名前で表示する）
+const CANONICAL_NAMES = [
+  "鶏むね肉", "鶏もも肉", "鶏ひき肉", "ささみ", "手羽元", "手羽先", "豚ひき肉", "牛ひき肉", "合いびき肉", "ひき肉",
+  "豚バラ肉", "豚こま切れ肉", "牛こま切れ肉", "豚ロース肉", "牛薄切り肉", "豚薄切り肉",
+  "玉ねぎ", "にんじん", "じゃがいも", "長ねぎ", "小ねぎ", "しょうが", "にんにく", "しいたけ", "きゅうり", "なす",
+  "かぼちゃ", "ごぼう", "れんこん", "大根", "白菜", "ほうれん草", "キャベツ", "卵", "豆腐",
+  "醤油", "薄口醤油", "みりん", "酒", "味噌", "ごま油", "ごま", "塩", "塩こしょう", "こしょう", "黒こしょう",
+  "サラダ油", "砂糖", "小麦粉", "片栗粉", "鶏ガラスープの素", "めんつゆ", "ケチャップ", "マヨネーズ", "酢",
+  "顆粒和風だし", "おろしにんにく", "おろししょうが",
+]
+const CANONICAL_BY_KEY = Object.fromEntries(CANONICAL_NAMES.map(n => [ingredientKey(n), n]))
+
+// 食材名を正規化（表記ゆれを統一した表示名。辞書にないものは注記を外した元の名前）
 function normalizeIngredientName(name) {
   if (!name) return name
-  const trimmed = name.trim()
-  // 1. 辞書に直接マッチ
-  if (INGREDIENT_ALIASES[trimmed]) return INGREDIENT_ALIASES[trimmed]
-  // 2. カタカナをひらがなに変換してから辞書を再チェック
-  const hiraVersion = katakanaToHiragana(trimmed)
-  if (INGREDIENT_ALIASES[hiraVersion]) return INGREDIENT_ALIASES[hiraVersion]
-  // 3. 辞書の値（正規化後の名前）をひらがな化したものと比較し、一致すれば統一
-  for (const [key, val] of Object.entries(INGREDIENT_ALIASES)) {
-    if (katakanaToHiragana(key) === hiraVersion) return val
-  }
-  return trimmed
+  const cleaned = cleanIngredientName(name)
+  return CANONICAL_BY_KEY[ingredientKey(cleaned)] || cleaned
 }
 
 // 同名食材は1行にまとめる。同じ単位は合算し、単位が異なる場合は parts に内訳を持たせる
@@ -134,9 +161,9 @@ function mergeIngredientsAdvanced(selections, recipes) {
     recipe.ingredients.filter(i => i.type === "通常食材").forEach(ing => {
       const parsed = parseAmount(ing.amount)
       const { amount, unit } = normalizeUnit(parsed * sel.portion, ing.unit)
-      const normalizedName = normalizeIngredientName(ing.name)
-      if (!map[normalizedName]) map[normalizedName] = { ...ing, name: normalizedName, parts: {} }
-      const parts = map[normalizedName].parts
+      const key = ingredientKey(ing.name)
+      if (!map[key]) map[key] = { ...ing, name: normalizeIngredientName(ing.name), parts: {} }
+      const parts = map[key].parts
       if (!parts[unit]) parts[unit] = { unit, amount: 0, recipes: [] }
       parts[unit].amount += amount
       if (!parts[unit].recipes.includes(recipe.name)) parts[unit].recipes.push(recipe.name)
@@ -197,10 +224,10 @@ function mergeSeasonings(selections, recipes) {
     const r = recipes.find(r => r.id === sel.recipeId)
     if (!r) return
     r.ingredients.filter(i => i.type === "調味料").forEach(ing => {
-      const normalizedName = normalizeIngredientName(ing.name)
-      if (!map[normalizedName]) map[normalizedName] = { ...ing, name: normalizedName, totalAmount: 0, recipes: [] }
-      map[normalizedName].totalAmount += (parseAmount(ing.amount) || 0) * sel.portion
-      if (!map[normalizedName].recipes.includes(r.name)) map[normalizedName].recipes.push(r.name)
+      const key = ingredientKey(ing.name)
+      if (!map[key]) map[key] = { ...ing, name: normalizeIngredientName(ing.name), totalAmount: 0, recipes: [] }
+      map[key].totalAmount += (parseAmount(ing.amount) || 0) * sel.portion
+      if (!map[key].recipes.includes(r.name)) map[key].recipes.push(r.name)
     })
   })
   return Object.values(map)
@@ -401,6 +428,8 @@ input[type=date]{cursor:pointer;}
 .part-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
 .part-label{flex:1;font-size:11px;color:#7f8e85;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .num-btn.sm{width:24px;height:24px;font-size:14px;}
+.adjust-hint{display:block;border:none;background:none;padding:2px 0 0;font-family:inherit;font-size:10px;color:#b8542a;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+.part-label .adjust-hint{display:inline;}
 .chip-row{display:flex;gap:6px;overflow-x:auto;padding:2px 16px 6px;margin:0 -16px;scrollbar-width:none;}
 .chip-row::-webkit-scrollbar{display:none;}
 .chip-row .pill-btn{white-space:nowrap;flex-shrink:0;}
@@ -937,14 +966,21 @@ export default function App() {
     return [...merged, ...seasonings, ...manual]
   }, [allActiveSels, recipes, seasoningChecks, allSeasonings, manualItems])
 
+  // 数量調整は「レシピの量からの増減」{ delta } で持つ。レシピや献立が変わっても量が追従する
+  // （以前の形式＝調整後の数値そのものは、元の量が分からず古い値が残るため使わない）
+  const applyAdjust = (base, adj) => {
+    const b = parseAmount(base) || 0
+    if (!adj || typeof adj !== "object" || typeof adj.delta !== "number" || !adj.delta) return { displayAmount: b, adjusted: false }
+    return { displayAmount: Math.max(0, Math.round((b + adj.delta) * 10) / 10), adjusted: true }
+  }
   const shoppingList = useMemo(() => baseShoppingList
     .filter(i => !deletedItems.has(i.name))
     .map(i => ({
       ...i,
-      displayAmount: shoppingAdjust[i.name] !== undefined ? shoppingAdjust[i.name] : i.amount,
+      ...(i.isSeasoning ? { displayAmount: i.amount, adjusted: false } : applyAdjust(i.amount, shoppingAdjust[i.name])),
       parts: i.mixed ? i.parts.map(p => {
         const key = adjustKey(i.name, p.unit, true)
-        return { ...p, key, displayAmount: shoppingAdjust[key] !== undefined ? shoppingAdjust[key] : p.amount }
+        return { ...p, key, ...applyAdjust(p.amount, shoppingAdjust[key]) }
       }) : i.parts,
     }))
     .sort((a, b) => { const ai = STORE_ORDER.indexOf(a.category), bi = STORE_ORDER.indexOf(b.category); return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) })
@@ -955,8 +991,18 @@ export default function App() {
     // g・ml系は10刻み、それ以外（個・本・缶・人前・枚 etc）は1刻み
     const bigStep = ["g","ml","cc"].includes(unit)
     const step = bigStep ? 10 : 1
-    const cur = shoppingAdjust[key] !== undefined ? shoppingAdjust[key] : (parseAmount(base) || 0)
-    const next = { ...shoppingAdjust, [key]: Math.max(0, Math.round((cur + delta * step) * 10) / 10) }
+    const b = parseAmount(base) || 0
+    const cur = applyAdjust(base, shoppingAdjust[key]).displayAmount
+    const nextAmount = Math.max(0, Math.round((cur + delta * step) * 10) / 10)
+    const nextDelta = Math.round((nextAmount - b) * 10) / 10
+    // 以前の形式（数値）の調整は捨て、増減が0なら記録しない
+    const next = Object.fromEntries(Object.entries(shoppingAdjust).filter(([k, v]) => k !== key && v && typeof v === "object"))
+    if (nextDelta) next[key] = { delta: nextDelta }
+    setShoppingAdjust(next); triggerSave(buildSave({ shoppingAdjust: next }))
+  }
+  const resetAdjust = key => {
+    const next = { ...shoppingAdjust }
+    delete next[key]
     setShoppingAdjust(next); triggerSave(buildSave({ shoppingAdjust: next }))
   }
   const removeShoppingItem = name => {
@@ -1359,12 +1405,15 @@ export default function App() {
                                 <div style={{ fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
                                 {item.isSeasoning && <span style={{ fontSize: 10, color: "#7f8e85" }}>調味料（買い足し）</span>}
                                 {item.isManual && <span style={{ fontSize: 10, color: "#5a8aa0" }}>手動追加</span>}
+                                {!item.mixed && item.adjusted && (
+                                  <button className="adjust-hint" onClick={() => resetAdjust(item.name)}>{item.isManual ? "最初は" : "レシピでは"}{item.amount}{item.unit}・元に戻す</button>
+                                )}
                                 {/* 単位が異なる同名食材：内訳ごとに数量調整 */}
                                 {item.mixed && <>
                                   <div style={{ fontSize: 12, fontWeight: 700, color: "#2e5d4e", marginTop: 2 }}>{item.parts.map(p => `${p.displayAmount}${p.unit}`).join(" ＋ ")}</div>
                                   {item.parts.map(p => (
                                     <div key={p.unit} className="part-row">
-                                      <span className="part-label">└ {p.recipes.join("・")}</span>
+                                      <span className="part-label">└ {p.recipes.join("・")}{p.adjusted && <button className="adjust-hint" style={{ marginLeft: 4 }} onClick={() => resetAdjust(p.key)}>元は{p.amount}{p.unit}・戻す</button>}</span>
                                       <div className="num-ctrl">
                                         <button className="num-btn sm" onClick={() => adjustShopping(p.key, -1, p.unit, p.amount)}>−</button>
                                         <span style={{ minWidth: 48, textAlign: "center", fontSize: 12, fontWeight: 700 }}>{p.displayAmount}{p.unit}</span>
