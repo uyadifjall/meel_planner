@@ -1202,7 +1202,7 @@ export default function App() {
                     <button className="btn-icon" style={{ color: "#c0391b" }} onClick={() => removeBentoEntry(entry.id)}>✕</button>
                   </div>
                   {entry.recipeId && (
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                       <select className="portion-select" value={entry.portion} onChange={e => updateBentoEntry(entry.id, { portion: Number(e.target.value) })}>
                         <option value={0.5}>0.5回分（1人前）</option>
                         <option value={1}>1回分（2人前）</option>
@@ -1212,7 +1212,8 @@ export default function App() {
                         <option value={3}>3回分（6人前）</option>
                         <option value={4}>4回分（8人前）</option>
                       </select>
-                      <input placeholder="メモ（例：月〜水用）" value={entry.note || ""} onChange={e => updateBentoEntry(entry.id, { note: e.target.value })} style={{ flex: 1, fontSize: 12, padding: "6px 10px" }} />
+                      <button className="btn btn-ghost btn-sm" style={{ fontSize: 12, whiteSpace: "nowrap", color: "#5a3fa8" }} onClick={() => setDetailRecipe(recipes.find(r => r.id === entry.recipeId))}>レシピ確認 →</button>
+                      <input placeholder="メモ（例：月〜水用）" value={entry.note || ""} onChange={e => updateBentoEntry(entry.id, { note: e.target.value })} style={{ flex: "1 0 100%", fontSize: 12, padding: "6px 10px" }} />
                     </div>
                   )}
                 </div>
