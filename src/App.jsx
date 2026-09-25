@@ -40,12 +40,25 @@ function resolveTagDefs(saved, recipes) {
 }
 
 // 「└ レシピ名 量」の内訳。使うレシピが1つなら量は合計と同じなので名前だけ出す
+// 複数レシピのときは折りたたみ（レシピ名を1行で出し、タップで量つきの内訳を開く）
+// ※単位が混ざる食材（g と 枚 など）の内訳は、買い物リスト側で常に表示している
 function RecipeBreakdown({ list }) {
+  const [open, setOpen] = useState(false)
   if (!list || !list.length) return null
-  const single = list.length === 1
+  if (list.length === 1) return <div className="breakdown"><div className="bd-line"><span className="bd-name">└ {list[0].recipe}</span></div></div>
+  const toggle = e => { e.stopPropagation(); setOpen(o => !o) } // 調味料チェックの行のチェック切り替えに伝えない
+  if (!open) {
+    return (
+      <button type="button" className="breakdown bd-toggle" onClick={toggle} aria-expanded="false">
+        <span className="bd-name">└ {list.map(b => b.recipe).join("・")}</span>
+        <span className="bd-caret">内訳 ▾</span>
+      </button>
+    )
+  }
   return (
     <div className="breakdown">
-      {list.map(b => <div key={b.recipe} className="bd-line"><span className="bd-name">└ {b.recipe}</span>{!single && b.label && <span className="breakdown-amt">{b.label}</span>}</div>)}
+      {list.map(b => <div key={b.recipe} className="bd-line"><span className="bd-name">└ {b.recipe}</span>{b.label && <span className="breakdown-amt">{b.label}</span>}</div>)}
+      <button type="button" className="bd-toggle bd-close" onClick={toggle} aria-expanded="true"><span className="bd-caret">閉じる ▴</span></button>
     </div>
   )
 }
@@ -483,6 +496,9 @@ input[type=date]{cursor:pointer;}
 .breakdown-amt{color:#2e5d4e;font-weight:700;margin-left:6px;white-space:nowrap;flex-shrink:0;}
 .bd-line{display:flex;align-items:baseline;min-width:0;}
 .bd-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bd-toggle{display:flex;align-items:baseline;gap:6px;width:100%;max-width:100%;border:none;background:none;padding:0;font-family:inherit;text-align:left;cursor:pointer;color:#7f8e85;}
+.bd-close{margin-top:2px;width:auto;}
+.bd-caret{flex-shrink:0;font-size:10px;font-weight:700;color:#b8542a;white-space:nowrap;}
 .num-btn.sm{width:24px;height:24px;font-size:14px;}
 .adjust-hint{display:block;border:none;background:none;padding:2px 0 0;font-family:inherit;font-size:10px;color:#b8542a;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
 .part-label .adjust-hint{display:inline;}
