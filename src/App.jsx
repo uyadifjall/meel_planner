@@ -202,12 +202,16 @@ function normalizeIngredientName(name) {
 }
 
 // 同名食材は1行にまとめる。同じ単位は合算し、単位が異なる場合は parts に内訳を持たせる
+// 調味料として扱うか：種類が「調味料」、または売り場が「調味料」
+// （登録時に売り場だけ自動で「調味料」になり、種類が「通常食材」のまま残っているレシピがあるため）
+function isSeasoningIng(ing) { return ing.type === "調味料" || ing.category === "調味料" }
+
 function mergeIngredientsAdvanced(selections, recipes) {
   const map = {}
   selections.forEach(sel => {
     const recipe = recipes.find(r => r.id === sel.recipeId)
     if (!recipe) return
-    recipe.ingredients.filter(i => i.type === "通常食材").forEach(ing => {
+    recipe.ingredients.filter(i => !isSeasoningIng(i)).forEach(ing => {
       const parsed = parseAmount(ing.amount)
       const { amount, unit } = normalizeUnit(parsed * sel.portion, ing.unit)
       const key = ingredientKey(ing.name)
@@ -280,7 +284,7 @@ function mergeSeasonings(selections, recipes) {
   selections.forEach(sel => {
     const r = recipes.find(r => r.id === sel.recipeId)
     if (!r) return
-    r.ingredients.filter(i => i.type === "調味料").forEach(ing => {
+    r.ingredients.filter(isSeasoningIng).forEach(ing => {
       const key = ingredientKey(ing.name)
       if (!map[key]) map[key] = { ...ing, name: normalizeIngredientName(ing.name), units: {}, recipes: [] }
       // 単位をそろえて合算（大さじ＋小さじ は小さじで足す。g と大さじのように換算できないものは別々に）
@@ -640,12 +644,12 @@ function RecipeDetailSheet({ recipe, tagDefs, onClose, onEdit, onDelete }) {
         {activeTab === "ingredients" && <div style={{ padding: "20px 16px" }}>
           <div style={{ fontSize: 12, color: "#8f9d94", marginBottom: 14 }}>基本 {recipe.servings || 2}人前</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-            {recipe.ingredients.filter(i => i.type === "通常食材").map((ing, i) => <div key={i} className="ing-chip"><span>{ing.name}</span><span className="ing-amount">{formatQty(ing.amount, ing.unit)}</span></div>)}
+            {recipe.ingredients.filter(i => !isSeasoningIng(i)).map((ing, i) => <div key={i} className="ing-chip"><span>{ing.name}</span><span className="ing-amount">{formatQty(ing.amount, ing.unit)}</span></div>)}
           </div>
-          {recipe.ingredients.some(i => i.type === "調味料") && <>
+          {recipe.ingredients.some(isSeasoningIng) && <>
             <div style={{ fontSize: 12, color: "#8f9d94", marginBottom: 10, fontWeight: 700 }}>調味料</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {recipe.ingredients.filter(i => i.type === "調味料").map((ing, i) => <div key={i} className="ing-chip" style={{ background: "#f5f0fa", borderColor: "#d8cce8" }}><span>{ing.name}</span><span className="ing-amount" style={{ color: "#6a3fa0" }}>{formatQty(ing.amount, ing.unit)}</span></div>)}
+              {recipe.ingredients.filter(isSeasoningIng).map((ing, i) => <div key={i} className="ing-chip" style={{ background: "#f5f0fa", borderColor: "#d8cce8" }}><span>{ing.name}</span><span className="ing-amount" style={{ color: "#6a3fa0" }}>{formatQty(ing.amount, ing.unit)}</span></div>)}
             </div>
           </>}
         </div>}
@@ -2020,10 +2024,13 @@ function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
   const removeStep = i => setForm(f => ({ ...f, steps: f.steps.filter((_, j) => j !== i) }))
   const setIng = (i, k, v) => setForm(f => ({ ...f, ingredients: f.ingredients.map((x, j) => {
     if (j !== i) return x
-    if (k === "category") return { ...x, category: v, _catAuto: false }
+    // 種類（通常食材／調味料）は売り場に合わせて自動で切り替える。自分で種類を選んだあとは触らない
+    const typeFor = (cat, cur) => x._typeManual ? cur : (cat === "調味料" ? "調味料" : "通常食材")
+    if (k === "type") return { ...x, type: v, _typeManual: true }
+    if (k === "category") return { ...x, category: v, type: typeFor(v, x.type), _catAuto: false }
     if (k === "name" && x._catAuto) {
       const inferred = inferCategory(v)
-      return inferred ? { ...x, name: v, category: inferred } : { ...x, name: v }
+      return inferred ? { ...x, name: v, category: inferred, type: typeFor(inferred, x.type) } : { ...x, name: v }
     }
     return { ...x, [k]: v }
   }) }))
@@ -2060,7 +2067,7 @@ function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
   const handleSave = () => {
     if (!form.name || uploading) return
     cleanupUploads(form.photoPath)
-    const ingredients = form.ingredients.map(({ _catAuto, ...rest }) => rest)
+    const ingredients = form.ingredients.map(({ _catAuto, _typeManual, ...rest }) => rest)
     onSave(withTags({ ...form, ingredients, steps: form.steps.filter(s => s.trim()) }, form.tags || []))
   }
   const photoUrl = getRecipePhotoUrl(form.photoPath)
