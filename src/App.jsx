@@ -692,6 +692,12 @@ export default function App() {
   const saveTimer = useRef(null)
   const isSaving = useRef(false)
   const lastLocalCheckWrite = useRef(0)
+  // チェック状態の最新値と保存の状態（続けてタップしても取りこぼさないように ref で持つ）
+  const latestChecks = useRef([])
+  const [checksLoaded, setChecksLoaded] = useState(false) // サーバーのチェック状態を一度読み込んだか
+  const checkSaving = useRef(false)
+  const checkDirty = useRef(false)
+  useEffect(() => { latestChecks.current = checkedItems }, [checkedItems])
 
   const showToast = (msg, type = "ok") => { setToast({ msg, type }); setTimeout(() => setToast(null), 2500) }
 
@@ -748,13 +754,14 @@ export default function App() {
       if (disposed) return
       // 自分の書き込み直後に届く古いイベントで表示が巻き戻らないよう、少し待ってから取り直す
       const sinceLocal = Date.now() - lastLocalCheckWrite.current
-      if (sinceLocal < 1500) {
+      if (sinceLocal < 1500 || checkSaving.current || checkDirty.current) {
         clearTimeout(reconcileTimer)
-        reconcileTimer = setTimeout(fetchAll, 1500 - sinceLocal)
+        reconcileTimer = setTimeout(fetchAll, Math.max(500, 1500 - sinceLocal))
         return
       }
       const next = checks || []
       setCheckedItems(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
+      setChecksLoaded(true)
     }
     const applyRemoteData = data => {
       if (disposed || !data || unsavedChanges.current) return
@@ -1103,13 +1110,35 @@ export default function App() {
   const hiddenShoppingNames = useMemo(() => [...new Set(baseShoppingList.filter(i => deletedItems.has(i.name)).map(i => i.name))], [baseShoppingList, deletedItems])
 
   // ── チェック（リアルタイム同期） ──
-  const toggleCheck = async (name) => {
-    const isChecked = checkedItems.includes(name)
-    const next = isChecked ? checkedItems.filter(n => n !== name) : [...checkedItems, name]
+  // チェックの保存は1件ずつ順番に送る。続けてチェックしたときに古い保存が後から届いて
+  // 新しいチェックが消えることがあったため、送信中に変わった分は送信後に最新の状態で送り直す
+  const flushChecks = async () => {
+    if (checkSaving.current) { checkDirty.current = true; return }
+    checkSaving.current = true
+    try {
+      do {
+        checkDirty.current = false
+        const snapshot = latestChecks.current
+        let ok = false
+        for (let i = 0; i < 3 && !ok; i++) {
+          try { await saveShoppingChecks(userId, snapshot); ok = true }
+          catch { await new Promise(r => setTimeout(r, 800 * (i + 1))) }
+        }
+        lastLocalCheckWrite.current = Date.now()
+        if (!ok) { showToast("チェックを保存できませんでした。通信状況を確認してください", "error"); break }
+      } while (checkDirty.current)
+    } finally {
+      checkSaving.current = false
+      lastLocalCheckWrite.current = Date.now()
+    }
+  }
+  const toggleCheck = name => {
+    const cur = latestChecks.current
+    const next = cur.includes(name) ? cur.filter(n => n !== name) : [...cur, name]
+    latestChecks.current = next
     setCheckedItems(next)
     lastLocalCheckWrite.current = Date.now()
-    try { await saveShoppingChecks(userId, next) } catch {}
-    lastLocalCheckWrite.current = Date.now()
+    flushChecks()
   }
 
   // 手動追加アイテム
@@ -1139,19 +1168,58 @@ export default function App() {
   }
 
   // ドラッグストア用リスト操作
+  // ── ドラッグストア：「今回買うもの」と「これまでに買ったもの（履歴）」 ──
+  // drugItems: { id, name, inList: 今回のリストにあるか, boughtAt: 最後に買った日, buyCount: 買った回数 }
+  // inList が無い古いデータは「リストにある」とみなす
+  const inDrugList = m => m.inList !== false
+  const saveDrug = next => { setDrugItems(next); triggerSave(buildSave({ drugItems: next })) }
   const addDrugItem = () => {
     const trimmed = addManualInput.trim()
     if (!trimmed) return
-    if (drugItems.find(m => m.name === trimmed)) { showToast("同じ名前のアイテムがあります", "warn"); return }
-    const newItem = { id: Date.now(), name: trimmed }
-    const next = [...drugItems, newItem]
-    setDrugItems(next); triggerSave(buildSave({ drugItems: next }))
+    const existing = drugItems.find(m => ingredientKey(m.name) === ingredientKey(trimmed))
+    if (existing && inDrugList(existing)) { showToast("すでにリストにあります", "warn"); return }
+    if (existing) {
+      saveDrug(drugItems.map(m => m.id === existing.id ? { ...m, inList: true } : m))
+      showToast(`「${existing.name}」を履歴からリストに戻しました`)
+    } else {
+      saveDrug([...drugItems, { id: Date.now(), name: trimmed, inList: true, buyCount: 0 }])
+    }
     setAddManualInput("")
   }
-  const removeDrugItem = name => {
-    const next = drugItems.filter(m => m.name !== name)
-    setDrugItems(next); triggerSave(buildSave({ drugItems: next }))
+  // チェック＝買った：履歴へ移す
+  const buyDrugItem = id => {
+    saveDrug(drugItems.map(m => m.id === id ? { ...m, inList: false, boughtAt: toYMD(new Date()), buyCount: (m.buyCount || 0) + 1 } : m))
   }
+  const relistDrugItem = id => saveDrug(drugItems.map(m => m.id === id ? { ...m, inList: true } : m))
+  // ✕：今回は買わない（一度も買っていないものは消す、買ったことがあるものは履歴に戻す）
+  const unlistDrugItem = id => {
+    const item = drugItems.find(m => m.id === id)
+    if (!item) return
+    saveDrug(item.boughtAt ? drugItems.map(m => m.id === id ? { ...m, inList: false } : m) : drugItems.filter(m => m.id !== id))
+  }
+  const deleteDrugItem = id => {
+    const item = drugItems.find(m => m.id === id)
+    if (item && window.confirm(`「${item.name}」を履歴から削除しますか？`)) saveDrug(drugItems.filter(m => m.id !== id))
+  }
+  const [drugHistoryFilter, setDrugHistoryFilter] = useState("")
+
+  // 以前の画面でチェック済みのまま残っていたものは、一度だけ「買った」として履歴に移す
+  const drugMigrated = useRef(false)
+  useEffect(() => {
+    if (drugMigrated.current || !userId || !checksLoaded || !drugItems.length) return
+    if (drugItems.every(m => m.inList !== undefined)) { drugMigrated.current = true; return }
+    drugMigrated.current = true
+    const today = toYMD(new Date())
+    const boughtNames = new Set(drugItems.filter(m => m.inList === undefined && checkedItems.includes(m.name)).map(m => m.name))
+    saveDrug(drugItems.map(m => m.inList !== undefined ? m
+      : boughtNames.has(m.name) ? { ...m, inList: false, boughtAt: today, buyCount: (m.buyCount || 0) + 1 } : { ...m, inList: true, buyCount: m.buyCount || 0 }))
+    if (boughtNames.size) {
+      const nextChecks = latestChecks.current.filter(n => !boughtNames.has(n))
+      latestChecks.current = nextChecks
+      setCheckedItems(nextChecks)
+      flushChecks()
+    }
+  }, [userId, checksLoaded, drugItems, checkedItems]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 今回を締める ──
   const confirmPlan = () => {
@@ -1187,6 +1255,7 @@ export default function App() {
     setSeasoningChecks({}); setShoppingAdjust({}); setDeletedItems(new Set())
     setManualItems([]); setDrugItems([]); setCheckedItems([]); setHistory([])
     setTagDefs(DEFAULT_TAG_DEFS); setFilterTags([]); setSearch(""); setScreen("catalog")
+    setChecksLoaded(false); drugMigrated.current = false
   }
 
   if (autoLogging) return (
@@ -1558,39 +1627,64 @@ export default function App() {
               </>
             ) : (
               <>
-                {/* ドラッグストア用リスト */}
+                {/* ドラッグストア：今回買うもの ＋ これまでに買ったもの（履歴） */}
                 <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 11, color: "#66776d", display: "flex", alignItems: "center" }}><span className={`sync-dot ${syncStatus === "live" ? "" : syncStatus === "polling" ? "poll" : "off"}`} />{syncStatus === "live" ? "リアルタイム同期中" : syncStatus === "polling" ? "30秒ごとに同期中" : "接続中..."}</span>
-                </div>
-                <div style={{ background: "#fdf0e9", border: "1.5px solid #f3c3a8", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#a64a22" }}>
-                  💊 ウェル活・ドラッグストアの買い物はここで管理。スーパーのリストとは別に独立しています。
                 </div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                   <input placeholder="＋ アイテムを追加（例：シャンプー）" value={addManualInput} onChange={e => setAddManualInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addDrugItem()} style={{ flex: 1, fontSize: 13, padding: "9px 12px" }} />
                   <button className="btn btn-primary btn-sm" onClick={addDrugItem} style={{ whiteSpace: "nowrap", background: "#d9602c" }}>追加</button>
                 </div>
-                {drugItems.length > 0 && <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-                  <label className="switch" onClick={() => { const v = !moveChecked; setMoveChecked(v); saveMoveChecked(v) }}>
-                    <span className={`switch-track ${moveChecked ? "on" : ""}`} />チェックしたら下へ移動
-                  </label>
-                </div>}
-                {!drugItems.length && <div className="empty-state"><div style={{ fontSize: 44, marginBottom: 12 }}>💊</div><div>ウェル活で買いたいものを<br />上の欄から追加してください</div></div>}
-                {drugItems.length > 0 && (
-                  <div className="card" style={{ overflow: "hidden" }}>
-                    {(moveChecked ? [...drugItems.filter(i => !checkedItems.includes(i.name)), ...drugItems.filter(i => checkedItems.includes(i.name))] : drugItems).map(item => {
-                      const isChecked = checkedItems.includes(item.name)
-                      return (
-                        <div key={item.name} className="item-row" style={{ opacity: isChecked ? 0.42 : 1, background: isChecked ? "#f6f2e9" : "#fff" }}>
-                          <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#d9602c" : "#d3cfc2"}`, background: isChecked ? "#d9602c" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
-                            {isChecked ? "✓" : ""}
+                {(() => {
+                  const listItems = drugItems.filter(inDrugList)
+                  const q = searchKey(drugHistoryFilter.trim())
+                  const historyAll = drugItems.filter(m => !inDrugList(m))
+                    .sort((a, b) => (b.boughtAt || "").localeCompare(a.boughtAt || "") || a.name.localeCompare(b.name, "ja"))
+                  const historyItems = q ? historyAll.filter(m => searchKey(m.name).includes(q)) : historyAll
+                  const today = toYMD(new Date())
+                  const boughtLabel = m => !m.boughtAt ? "" : m.boughtAt === today ? "今日買った" : `前回 ${formatDateLabel(m.boughtAt)}`
+                  return <>
+                    <div className="section-head">今回買うもの（{listItems.length}）</div>
+                    <div className="card" style={{ overflow: "hidden", marginBottom: 6 }}>
+                      {!listItems.length && <div style={{ padding: "16px", fontSize: 12, color: "#8f9d94", textAlign: "center", lineHeight: 1.7 }}>今回買うものはありません。<br />上の欄から追加するか、下の履歴から「＋ リストへ」で戻してね</div>}
+                      {listItems.map(item => (
+                        <div key={item.id} className="item-row">
+                          <button aria-label={`${item.name}を買った`} onClick={() => buyDrugItem(item.id)} style={{ width: 24, height: 24, borderRadius: 6, border: "2px solid #d3cfc2", background: "#fff", cursor: "pointer", flexShrink: 0, padding: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 500, fontSize: 14 }}>{item.name}</div>
+                            {item.boughtAt && <div style={{ fontSize: 10, color: "#8f9d94", marginTop: 1 }}>{boughtLabel(item)}・{item.buyCount || 1}回買った</div>}
                           </div>
-                          <div style={{ flex: 1, fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
-                          <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => removeDrugItem(item.name)}>✕</button>
+                          <button className="btn btn-ghost btn-sm" aria-label="今回は買わない" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => unlistDrugItem(item.id)}>✕</button>
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                    {listItems.length > 0 && <div style={{ fontSize: 11, color: "#8f9d94", margin: "0 4px 16px" }}>□ をタップすると「買った」になり、履歴に移ります</div>}
+
+                    {historyAll.length > 0 && <>
+                      <div className="section-head" style={{ marginTop: listItems.length ? 0 : 10 }}>これまでに買ったもの（{historyAll.length}）</div>
+                      {historyAll.length > 8 && (
+                        <div className="search-box" style={{ marginBottom: 8 }}>
+                          <span className="icon">🔍</span>
+                          <input placeholder="履歴から探す" value={drugHistoryFilter} onChange={e => setDrugHistoryFilter(e.target.value)} style={{ fontSize: 13, padding: "8px 12px 8px 36px" }} />
+                          {drugHistoryFilter && <button className="clear" aria-label="クリア" onClick={() => setDrugHistoryFilter("")}>✕</button>}
+                        </div>
+                      )}
+                      <div className="card" style={{ overflow: "hidden", marginBottom: 14 }}>
+                        {!historyItems.length && <div style={{ padding: "14px", fontSize: 12, color: "#8f9d94", textAlign: "center" }}>見つかりません</div>}
+                        {historyItems.map(item => (
+                          <div key={item.id} className="item-row" style={{ background: "#fbf9f4" }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 14, color: "#3d5046" }}>{item.name}</div>
+                              {item.boughtAt && <div style={{ fontSize: 10, color: "#8f9d94", marginTop: 1 }}>{boughtLabel(item)}・{item.buyCount || 1}回</div>}
+                            </div>
+                            <button className="btn btn-outline btn-sm" style={{ whiteSpace: "nowrap", borderColor: "#f3c3a8", color: "#b8542a" }} onClick={() => relistDrugItem(item.id)}>＋ リストへ</button>
+                            <button className="icon-btn" aria-label="履歴から削除" onClick={() => deleteDrugItem(item.id)}>🗑</button>
+                          </div>
+                        ))}
+                      </div>
+                    </>}
+                  </>
+                })()}
               </>
             )}
           </div>
