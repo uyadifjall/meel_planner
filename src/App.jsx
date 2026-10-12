@@ -494,6 +494,8 @@ input[type=date]{cursor:pointer;}
 .url-btn{display:flex;align-items:center;gap:8px;background:#fdf0e9;border:1.5px solid #f3c3a8;border-radius:12px;padding:12px 16px;color:#b8542a;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;width:100%;text-decoration:none;}
 .spinner{width:36px;height:36px;border:3px solid #e2ddd0;border-top-color:#2e5d4e;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
 .date-entry{background:#fff;border-radius:12px;border:1.5px solid #e2ddd0;margin-bottom:8px;overflow:hidden;}
+.date-input{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;min-width:0;line-height:34px;text-align:left;}
+.date-input::-webkit-date-and-time-value{text-align:left;margin:0;}
 .date-entry-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fbf9f4;border-bottom:1px solid #ebe7dc;}
 .bento-section{background:#f0ebfa;border:1.5px solid #c8b8f0;border-radius:12px;margin-bottom:12px;overflow:hidden;}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:4px;}
@@ -1310,8 +1312,8 @@ export default function App() {
         </div>
         <div style={{ marginLeft: "auto", position: "relative" }}>
           <button aria-label="文字サイズ" aria-expanded={showFontMenu} onClick={() => setShowFontMenu(o => !o)}
-            style={{ height: 40, minWidth: 44, borderRadius: 12, border: "1.5px solid rgba(246,242,233,0.35)", cursor: "pointer", fontFamily: "inherit", background: showFontMenu ? "rgba(246,242,233,0.22)" : "transparent", color: "#f6f2e9", fontWeight: 700, padding: "0 8px", whiteSpace: "nowrap", display: "inline-flex", alignItems: "baseline", justifyContent: "center", lineHeight: 1 }}>
-            <span style={{ fontSize: 12 }}>あ</span><span style={{ fontSize: 17 }}>A</span>
+            style={{ height: 40, minWidth: 44, borderRadius: 12, border: "1.5px solid rgba(246,242,233,0.35)", cursor: "pointer", fontFamily: "inherit", background: showFontMenu ? "rgba(246,242,233,0.22)" : "transparent", color: "#f6f2e9", fontWeight: 700, padding: "0 8px", whiteSpace: "nowrap", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+            <span style={{ display: "inline-flex", alignItems: "baseline", lineHeight: 1 }}><span style={{ fontSize: 12 }}>あ</span><span style={{ fontSize: 17 }}>A</span></span>
           </button>
           {showFontMenu && <>
             <div onClick={() => setShowFontMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
@@ -1457,8 +1459,9 @@ export default function App() {
                         <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(group.entries[0].entry.id, -1)} disabled={firstIdx === 0}>▲</button>
                         <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(group.entries[group.entries.length-1].entry.id, 1)} disabled={lastIdx === sortedEntries.length - 1}>▼</button>
                       </div>
-                      {/* 日付と曜日は縦に並べ、残りの幅に合わせて伸び縮みさせる（文字を大きくしても重ならないように） */}
-                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                      {/* 日付・スキップ・✕を同じ高さの1行に並べ、その下に曜日（文字を大きくしても重ならないように） */}
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       <input type="date" value={group.date || ""}
                         onChange={e => {
                           // グループ内の全エントリの日付を一括更新
@@ -1466,23 +1469,24 @@ export default function App() {
                           const next = planEntries.map(pe => group.entries.find(g => g.entry.id === pe.id) ? { ...pe, date: newDate } : pe)
                           setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
                         }}
-                        style={{ width: "100%", maxWidth: 170, minWidth: 0, fontSize: 12, padding: "6px 6px", minHeight: 32 }} />
-                      <div style={{ fontSize: 11, color: group.date ? "#66776d" : "#b8542a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingLeft: 2 }}>{group.date ? formatDateLabel(group.date) : "日付未設定（タップして選択）"}</div>
-                      </div>
+                        className="date-input" style={{ flex: "1 1 auto", width: "100%", maxWidth: 170, minWidth: 0, fontSize: 12, padding: "0 8px", height: 34 }} />
                       {/* スキップ：グループの最初のエントリで代表 */}
                       <button onClick={() => {
                         const isSkipped = group.entries[0].entry.skip
                         const next = planEntries.map(pe => group.entries.find(g => g.entry.id === pe.id) ? { ...pe, skip: !isSkipped } : pe)
                         setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
-                      }} style={{ background: group.entries[0].entry.skip ? "#ebe7dc" : "none", border: "1.5px solid #d3cfc2", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: group.entries[0].entry.skip ? "#66776d" : "#a9b4ad", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
+                      }} style={{ background: group.entries[0].entry.skip ? "#ebe7dc" : "none", border: "1.5px solid #d3cfc2", borderRadius: 8, padding: "0 10px", height: 34, marginLeft: "auto", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: group.entries[0].entry.skip ? "#66776d" : "#a9b4ad", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
                         {group.entries[0].entry.skip ? "スキップ中" : "スキップ"}
                       </button>
-                      <button className="btn-icon" style={{ color: "#c0391b", flexShrink: 0, padding: "4px 4px" }} onClick={() => {
+                      <button className="btn-icon" style={{ color: "#c0391b", flexShrink: 0, padding: "4px 4px", height: 34 }} onClick={() => {
                         // グループ内の全エントリを削除
                         const ids = group.entries.map(g => g.entry.id)
                         const next = planEntries.filter(pe => !ids.includes(pe.id))
                         setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
                       }}>✕</button>
+                        </div>
+                      <div style={{ fontSize: 11, color: group.date ? "#66776d" : "#b8542a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingLeft: 2 }}>{group.date ? formatDateLabel(group.date) : "日付未設定（タップして選択）"}</div>
+                      </div>
                     </div>
 
                     {group.entries[0].entry.skip
