@@ -437,6 +437,7 @@ body{background:#f6f2e9;}
 .screen{flex:1;overflow-y:auto;padding-bottom:88px;}
 .card{background:#fff;border-radius:16px;box-shadow:0 1px 8px rgba(30,50,40,0.07);}
 .btn{border:none;border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+.btn,.pill-btn{white-space:nowrap;}
 .btn-primary{background:#2e5d4e;color:#fff;padding:11px 20px;font-size:14px;}
 .btn-primary:hover{background:#234a3d;}
 .btn-primary:disabled{background:#9aaba2;cursor:not-allowed;}
@@ -459,8 +460,10 @@ input[type=date]{cursor:pointer;}
 .pill-btn{border:1.5px solid #d3cfc2;border-radius:20px;background:#fff;color:#3d5046;padding:6px 14px;font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s;font-weight:500;}
 .pill-btn.active{background:#2e5d4e;color:#fff;border-color:#2e5d4e;}
 .section-head{font-size:11px;font-weight:700;color:#8f9d94;letter-spacing:.1em;padding:0 4px;margin-bottom:6px;}
-.item-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #ebe7dc;gap:10px;background:#fff;}
+.item-row{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;padding:12px 16px;border-bottom:1px solid #ebe7dc;gap:10px;background:#fff;}
 .item-row:last-child{border-bottom:none;}
+.item-main{flex:1 1 7.5em;min-width:7.5em;}
+.item-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0;}
 .num-ctrl{display:inline-flex;align-items:center;gap:4px;}
 .num-btn{width:28px;height:28px;border:1.5px solid #d3cfc2;border-radius:8px;background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#2e5d4e;font-weight:700;}
 .num-btn:hover{background:#e9f0ea;}
@@ -479,7 +482,7 @@ input[type=date]{cursor:pointer;}
 .login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f6f2e9;padding:24px;}
 .login-card{background:#fff;border-radius:20px;padding:36px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(30,50,40,0.10);}
 .tab-toggle{display:flex;border-radius:10px;background:#ebe7dc;padding:3px;gap:3px;margin-bottom:24px;}
-.tab-toggle button{flex:1;border:none;border-radius:8px;padding:9px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;}
+.tab-toggle button{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:none;border-radius:8px;padding:9px 4px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;}
 .tab-toggle button.active{background:#2e5d4e;color:#fff;}
 .tab-toggle button:not(.active){background:transparent;color:#66776d;}
 .step-row{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start;}
@@ -516,7 +519,7 @@ input[type=date]{cursor:pointer;}
 .bd-close{margin-top:2px;width:auto;}
 .bd-caret{flex-shrink:0;font-size:10px;font-weight:700;color:#b8542a;white-space:nowrap;}
 .num-btn.sm{width:24px;height:24px;font-size:14px;}
-.adjust-hint{display:block;border:none;background:none;padding:2px 0 0;font-family:inherit;font-size:10px;color:#b8542a;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+.adjust-hint{display:block;white-space:nowrap;border:none;background:none;padding:2px 0 0;font-family:inherit;font-size:10px;color:#b8542a;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
 .part-label .adjust-hint{display:inline;}
 .chip-row{display:flex;gap:6px;overflow-x:auto;padding:2px 16px 6px;margin:0 -16px;scrollbar-width:none;}
 .chip-row::-webkit-scrollbar{display:none;}
@@ -641,7 +644,7 @@ function RecipeDetailSheet({ recipe, tagDefs, onClose, onEdit, onDelete }) {
           {recipe.memo && <p style={{ fontSize: 13, color: "#cfe0d6", lineHeight: 1.6 }}>💬 {recipe.memo}</p>}
         </div>
         {photoUrl && <img src={photoUrl} alt={recipe.name} className="detail-photo" />}
-        {recipe.url && <div style={{ padding: "14px 16px", borderBottom: "1px solid #ebe7dc" }}><a href={recipe.url} target="_blank" rel="noopener noreferrer" className="url-btn"><span style={{ fontSize: 18 }}>▶️</span><span>参考動画・レシピを見る</span><span style={{ marginLeft: "auto", fontSize: 11, color: "#8f9d94" }}>外部リンク →</span></a></div>}
+        {recipe.url && <div style={{ padding: "14px 16px", borderBottom: "1px solid #ebe7dc" }}><a href={recipe.url} target="_blank" rel="noopener noreferrer" className="url-btn"><span style={{ fontSize: 18 }}>▶️</span><span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>参考動画・レシピを見る</span><span style={{ marginLeft: "auto", fontSize: 11, color: "#8f9d94", whiteSpace: "nowrap" }}>外部 →</span></a></div>}
         <div style={{ display: "flex", borderBottom: "2px solid #ebe7dc", background: "#fff" }}>
           {[{ id: "steps", label: "👨‍🍳 作り方" }, { id: "ingredients", label: "🥬 材料" }].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, border: "none", background: "none", padding: "13px", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: activeTab === t.id ? "#2e5d4e" : "#8f9d94", borderBottom: activeTab === t.id ? "2px solid #2e5d4e" : "2px solid transparent", marginBottom: -2, transition: "all .15s" }}>{t.label}</button>
@@ -1252,7 +1255,9 @@ export default function App() {
     setPlanEntries([]); setBentoEntries([]); setSeasoningChecks({})
     setShoppingAdjust({}); setDeletedItems(new Set()); setManualItems([])
     setCheckedItems([]); setShowConfirmPlan(false)
-    saveShoppingChecks(userId, []).catch(() => {})
+    // チェックのリセットも順番どおりに保存する（保存中のチェックが後から届いて戻らないように）
+    latestChecks.current = []
+    flushChecks()
     triggerSave(buildSave({ history: newHistory, planEntries: [], bentoEntries: [], seasoningChecks: {}, shoppingAdjust: {}, deletedItems: [], manualItems: [] }))
     setScreen("history")
   }
@@ -1305,7 +1310,7 @@ export default function App() {
         </div>
         <div style={{ marginLeft: "auto", position: "relative" }}>
           <button aria-label="文字サイズ" aria-expanded={showFontMenu} onClick={() => setShowFontMenu(o => !o)}
-            style={{ height: 40, minWidth: 44, borderRadius: 12, border: "1.5px solid rgba(246,242,233,0.35)", cursor: "pointer", fontFamily: "inherit", background: showFontMenu ? "rgba(246,242,233,0.22)" : "transparent", color: "#f6f2e9", fontWeight: 700, padding: "0 8px", whiteSpace: "nowrap" }}>
+            style={{ height: 40, minWidth: 44, borderRadius: 12, border: "1.5px solid rgba(246,242,233,0.35)", cursor: "pointer", fontFamily: "inherit", background: showFontMenu ? "rgba(246,242,233,0.22)" : "transparent", color: "#f6f2e9", fontWeight: 700, padding: "0 8px", whiteSpace: "nowrap", display: "inline-flex", alignItems: "baseline", justifyContent: "center", lineHeight: 1 }}>
             <span style={{ fontSize: 12 }}>あ</span><span style={{ fontSize: 17 }}>A</span>
           </button>
           {showFontMenu && <>
@@ -1452,6 +1457,8 @@ export default function App() {
                         <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(group.entries[0].entry.id, -1)} disabled={firstIdx === 0}>▲</button>
                         <button className="btn-icon" style={{ fontSize: 12, padding: "2px 6px" }} onClick={() => moveEntry(group.entries[group.entries.length-1].entry.id, 1)} disabled={lastIdx === sortedEntries.length - 1}>▼</button>
                       </div>
+                      {/* 日付と曜日は縦に並べ、残りの幅に合わせて伸び縮みさせる（文字を大きくしても重ならないように） */}
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
                       <input type="date" value={group.date || ""}
                         onChange={e => {
                           // グループ内の全エントリの日付を一括更新
@@ -1459,14 +1466,15 @@ export default function App() {
                           const next = planEntries.map(pe => group.entries.find(g => g.entry.id === pe.id) ? { ...pe, date: newDate } : pe)
                           setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
                         }}
-                        style={{ width: 128, fontSize: 12, padding: "6px 6px", flex: "0 0 auto" }} />
-                      <div style={{ fontSize: 12, color: "#66776d", whiteSpace: "nowrap", minWidth: 0 }}>{group.date ? formatDateLabel(group.date) : "日付未設定"}</div>
+                        style={{ width: "100%", maxWidth: 170, minWidth: 0, fontSize: 12, padding: "6px 6px", minHeight: 32 }} />
+                      <div style={{ fontSize: 11, color: group.date ? "#66776d" : "#b8542a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingLeft: 2 }}>{group.date ? formatDateLabel(group.date) : "日付未設定（タップして選択）"}</div>
+                      </div>
                       {/* スキップ：グループの最初のエントリで代表 */}
                       <button onClick={() => {
                         const isSkipped = group.entries[0].entry.skip
                         const next = planEntries.map(pe => group.entries.find(g => g.entry.id === pe.id) ? { ...pe, skip: !isSkipped } : pe)
                         setPlanEntries(next); triggerSave(buildSave({ planEntries: next }))
-                      }} style={{ marginLeft: "auto", background: group.entries[0].entry.skip ? "#ebe7dc" : "none", border: "1.5px solid #d3cfc2", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: group.entries[0].entry.skip ? "#66776d" : "#a9b4ad", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
+                      }} style={{ background: group.entries[0].entry.skip ? "#ebe7dc" : "none", border: "1.5px solid #d3cfc2", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: group.entries[0].entry.skip ? "#66776d" : "#a9b4ad", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
                         {group.entries[0].entry.skip ? "スキップ中" : "スキップ"}
                       </button>
                       <button className="btn-icon" style={{ color: "#c0391b", flexShrink: 0, padding: "4px 4px" }} onClick={() => {
@@ -1528,8 +1536,8 @@ export default function App() {
 
             {(planEntries.some(e => !e.skip && e.recipeId) || bentoEntries.some(e => e.recipeId)) && (
               <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setScreen("seasoning")}>調味料チェックへ →</button>
-                <button className="btn btn-outline" style={{ flex: 1, borderColor: "#e8a000", color: "#8a6000" }} onClick={() => setShowConfirmPlan(true)}>🗓 買い物を締める</button>
+                <button className="btn btn-outline" style={{ flex: 1, whiteSpace: "nowrap", padding: "10px 6px", minWidth: 0 }} onClick={() => setScreen("seasoning")}>調味料チェック →</button>
+                <button className="btn btn-outline" style={{ flex: 1, borderColor: "#e8a000", color: "#8a6000", whiteSpace: "nowrap", padding: "10px 6px", minWidth: 0 }} onClick={() => setShowConfirmPlan(true)}>🗓 買い物を締める</button>
               </div>
             )}
           </div>
@@ -1587,7 +1595,7 @@ export default function App() {
 
                 {/* 手動追加 */}
                 <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                  <input placeholder="＋ アイテムを手入力（例：洗剤）" value={addManualInput} onChange={e => setAddManualInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addManualItem()} style={{ flex: 1, fontSize: 13, padding: "9px 12px" }} />
+                  <input placeholder="＋ 手入力で追加（例：洗剤）" value={addManualInput} onChange={e => setAddManualInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addManualItem()} style={{ flex: 1, fontSize: 13, padding: "9px 12px" }} />
                   <button className="btn btn-primary btn-sm" onClick={addManualItem} style={{ whiteSpace: "nowrap" }}>追加</button>
                 </div>
 
@@ -1609,20 +1617,20 @@ export default function App() {
                               <div onClick={() => toggleCheck(item.name)} style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${isChecked ? "#2e5d4e" : "#d3cfc2"}`, background: isChecked ? "#2e5d4e" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, color: "#fff", fontSize: 14 }}>
                                 {isChecked ? "✓" : ""}
                               </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
+                              <div className="item-main">
                                 <div style={{ fontWeight: 500, fontSize: 14, textDecoration: isChecked ? "line-through" : "none" }}>{item.name}</div>
                                 {item.isSeasoning && <span style={{ fontSize: 10, color: "#7f8e85" }}>調味料（買い足し）</span>}
                                 {item.isManual && <span style={{ fontSize: 10, color: "#5a8aa0" }}>手動追加</span>}
                                 {!item.mixed && <RecipeBreakdown list={item.byRecipe} />}
                                 {!item.mixed && item.adjusted && (
-                                  <button className="adjust-hint" onClick={() => resetAdjust(item.name)}>{item.isManual ? "最初は" : "レシピでは"}{formatQty(item.amount, item.unit)}・元に戻す</button>
+                                  <button className="adjust-hint" onClick={() => resetAdjust(item.name)}>↺ {formatQty(item.amount, item.unit)}に戻す</button>
                                 )}
                                 {/* 単位が異なる同名食材：内訳ごとに数量調整 */}
                                 {item.mixed && <>
                                   <div style={{ fontSize: 12, fontWeight: 700, color: "#2e5d4e", marginTop: 2 }}>{item.parts.map(p => formatQty(p.displayAmount, p.unit)).join(" ＋ ")}</div>
                                   {item.parts.map(p => (
                                     <div key={p.unit} className="part-row">
-                                      <span className="part-label">{p.byRecipe.map(b => <div key={b.recipe} className="bd-line"><span className="bd-name">└ {b.recipe}</span>{p.byRecipe.length > 1 && <span className="breakdown-amt">{b.label}</span>}</div>)}{p.adjusted && <button className="adjust-hint" style={{ marginLeft: 4 }} onClick={() => resetAdjust(p.key)}>元は{formatQty(p.amount, p.unit)}・戻す</button>}</span>
+                                      <span className="part-label">{p.byRecipe.map(b => <div key={b.recipe} className="bd-line"><span className="bd-name">└ {b.recipe}</span>{p.byRecipe.length > 1 && <span className="breakdown-amt">{b.label}</span>}</div>)}{p.adjusted && <button className="adjust-hint" style={{ marginLeft: 4 }} onClick={() => resetAdjust(p.key)}>↺ {formatQty(p.amount, p.unit)}に戻す</button>}</span>
                                       <div className="num-ctrl">
                                         <button className="num-btn sm" onClick={() => adjustShopping(p.key, -1, p.unit, p.amount)}>−</button>
                                         <span style={{ minWidth: 48, textAlign: "center", fontSize: 12, fontWeight: 700 }}>{formatQty(p.displayAmount, p.unit)}</span>
@@ -1632,14 +1640,16 @@ export default function App() {
                                   ))}
                                 </>}
                               </div>
+                              <div className="item-actions">
                               {item.mixed ? null : !item.isSeasoning
                                 ? <div className="num-ctrl">
                                     <button className="num-btn" onClick={() => adjustShopping(item.name, -1, item.unit, item.amount)}>−</button>
-                                    <span style={{ minWidth: 60, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{formatQty(item.displayAmount, item.unit)}</span>
+                                    <span style={{ minWidth: 48, textAlign: "center", fontSize: 14, fontWeight: 700, whiteSpace: "nowrap" }}>{formatQty(item.displayAmount, item.unit)}</span>
                                     <button className="num-btn" onClick={() => adjustShopping(item.name, 1, item.unit, item.amount)}>＋</button>
                                   </div>
                                 : <span style={{ fontSize: 13, color: "#66776d" }}>{item.amountLabel || formatQty(item.amount, item.unit)}</span>}
                               <button className="btn btn-ghost btn-sm" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => item.isManual ? removeManualItem(item.name) : removeShoppingItem(item.name)}>✕</button>
+                              </div>
                             </div>
                           )
                         })}
@@ -1684,9 +1694,9 @@ export default function App() {
                       {listItems.map(item => (
                         <div key={item.id} className="item-row">
                           <button aria-label={`${item.name}を買った`} onClick={() => buyDrugItem(item.id)} style={{ width: 24, height: 24, borderRadius: 6, border: "2px solid #d3cfc2", background: "#fff", cursor: "pointer", flexShrink: 0, padding: 0 }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="item-main">
                             <div style={{ fontWeight: 500, fontSize: 14 }}>{item.name}</div>
-                            {item.boughtAt && <div style={{ fontSize: 10, color: "#8f9d94", marginTop: 1 }}>{boughtLabel(item)}・{item.buyCount || 1}回買った</div>}
+                            {item.boughtAt && <div style={{ fontSize: 10, color: "#8f9d94", marginTop: 1 }}><span style={{ whiteSpace: "nowrap" }}>{boughtLabel(item)}</span>・<span style={{ whiteSpace: "nowrap" }}>{item.buyCount || 1}回買った</span></div>}
                           </div>
                           <button className="btn btn-ghost btn-sm" aria-label="今回は買わない" style={{ color: "#c0391b", padding: "4px 8px" }} onClick={() => unlistDrugItem(item.id)}>✕</button>
                         </div>
@@ -1707,12 +1717,14 @@ export default function App() {
                         {!historyItems.length && <div style={{ padding: "14px", fontSize: 12, color: "#8f9d94", textAlign: "center" }}>見つかりません</div>}
                         {historyItems.map(item => (
                           <div key={item.id} className="item-row" style={{ background: "#fbf9f4" }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="item-main">
                               <div style={{ fontSize: 14, color: "#3d5046" }}>{item.name}</div>
-                              {item.boughtAt && <div style={{ fontSize: 10, color: "#8f9d94", marginTop: 1 }}>{boughtLabel(item)}・{item.buyCount || 1}回</div>}
+                              {item.boughtAt && <div style={{ fontSize: 10, color: "#8f9d94", marginTop: 1 }}><span style={{ whiteSpace: "nowrap" }}>{boughtLabel(item)}</span>・<span style={{ whiteSpace: "nowrap" }}>{item.buyCount || 1}回</span></div>}
                             </div>
+                            <div className="item-actions">
                             <button className="btn btn-outline btn-sm" style={{ whiteSpace: "nowrap", borderColor: "#f3c3a8", color: "#b8542a" }} onClick={() => relistDrugItem(item.id)}>＋ リストへ</button>
                             <button className="icon-btn" aria-label="履歴から削除" onClick={() => deleteDrugItem(item.id)}>🗑</button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1813,7 +1825,7 @@ export default function App() {
                         {m.isBento
                           ? <span style={{ fontSize: 11, color: "#4a2fa0", minWidth: 80 }}>🍱 お弁当</span>
                           : <span style={{ fontSize: 12, color: "#66776d", minWidth: 80 }}>{m.date ? formatDateLabel(m.date) : `${i+1}日目`}</span>}
-                        <span style={{ flex: 1, fontSize: 14, color: m.skip ? "#a9b4ad" : "#1f2a24" }}>{m.name}</span>
+                        <span className="item-main" style={{ fontSize: 14, color: m.skip ? "#a9b4ad" : "#1f2a24" }}>{m.name}</span>
                         {/* レシピ詳細を見るボタン */}
                         {!m.skip && (() => {
                           const r = (m.recipeId && recipes.find(r => r.id === m.recipeId)) || recipes.find(r => r.name === m.name)
@@ -2279,8 +2291,8 @@ function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
         {regTab === "basic" && (
           <div style={{ display: "grid", gap: 14 }}>
             <div style={{ background: "#fdf0e9", border: "1.5px solid #f3c3a8", borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
-                <label style={{ fontSize: 11, color: "#b8542a", fontWeight: 700 }}>🔗 レシピを取り込む</label>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", marginBottom: 8, gap: 8 }}>
+                <label style={{ fontSize: 11, color: "#b8542a", fontWeight: 700, whiteSpace: "nowrap" }}>🔗 レシピを取り込む</label>
                 <div style={{ display: "flex", gap: 4 }}>
                   {[{ id: "url", label: "URL" }, { id: "text", label: "文章から" }].map(m => (
                     <button key={m.id} className={`pill-btn ${importMode === m.id ? "active" : ""}`} style={{ padding: "3px 10px", fontSize: 11 }} onClick={() => { setImportMode(m.id); setImportMsg(null) }} disabled={importing}>{m.label}</button>
@@ -2288,13 +2300,15 @@ function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
                 </div>
               </div>
               {importMode === "url" ? (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input placeholder="レシピサイト・YouTube の URL" value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && runImport()} disabled={importing} inputMode="url" autoCapitalize="none" autoCorrect="off" style={{ flex: 1, fontSize: 13, padding: "8px 10px", background: "#fff" }} />
-                  <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importUrl.trim()} style={{ whiteSpace: "nowrap" }}>{importing ? "読み取り中..." : "取り込む"}</button>
-                </div>
+                <>
+                  {/* 文字サイズの設定に関係なく、見た目の大きさを固定（案内文が欠けないように1行を全部使う） */}
+                  <input placeholder="レシピサイト・YouTube の URL" value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && runImport()} disabled={importing} inputMode="url" autoCapitalize="none" autoCorrect="off"
+                    style={{ width: "100%", fontSize: "calc(13px / var(--zoom, 1))", padding: "calc(9px / var(--zoom, 1)) 10px", background: "#fff" }} />
+                  <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importUrl.trim()} style={{ width: "100%", marginTop: 8, whiteSpace: "nowrap" }}>{importing ? "読み取り中..." : "取り込む"}</button>
+                </>
               ) : (
                 <>
-                  <textarea rows={5} placeholder={"クックパッドのアプリなどでレシピをコピーして貼り付け\n（料理名・材料・作り方がまとめて入っていればOK）"} value={importText} onChange={e => setImportText(e.target.value)} disabled={importing} style={{ fontSize: 13, padding: "8px 10px", background: "#fff", resize: "vertical" }} />
+                  <textarea rows={5} placeholder={"クックパッドのアプリなどでレシピをコピーして貼り付け\n（料理名・材料・作り方がまとめて入っていればOK）"} value={importText} onChange={e => setImportText(e.target.value)} disabled={importing} style={{ fontSize: "calc(13px / var(--zoom, 1))", padding: "8px 10px", background: "#fff", resize: "vertical" }} />
                   <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importText.trim()} style={{ width: "100%", marginTop: 8 }}>{importing ? "AIで読み取り中..." : "AIで取り込む"}</button>
                 </>
               )}
