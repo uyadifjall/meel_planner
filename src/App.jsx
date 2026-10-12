@@ -380,6 +380,16 @@ function compressImage(file, maxSize = 1280, quality = 0.82) {
 
 // 買い物リスト：チェックしたら下へ移動するか（端末ごとの設定）
 const LS_MOVE_CHECKED = "kondate_move_checked"
+// 文字サイズ（端末ごとの設定）。アプリ全体を同じ比率で拡大する（文字だけだとボタンや行が窮屈になるため）
+const FONT_SCALES = [
+  { id: "normal", label: "標準", zoom: 1 },
+  { id: "large", label: "大", zoom: 1.15 },
+  { id: "xlarge", label: "特大", zoom: 1.3 },
+]
+const LS_FONT_SCALE = "kondate_font_scale"
+function getFontScale() { try { const v = localStorage.getItem(LS_FONT_SCALE); return FONT_SCALES.some(f => f.id === v) ? v : "normal" } catch { return "normal" } }
+function saveFontScale(v) { try { localStorage.setItem(LS_FONT_SCALE, v) } catch {} }
+
 function getMoveChecked() { try { return localStorage.getItem(LS_MOVE_CHECKED) !== "0" } catch { return true } }
 function saveMoveChecked(v) { try { localStorage.setItem(LS_MOVE_CHECKED, v ? "1" : "0") } catch {} }
 
@@ -441,8 +451,8 @@ input,select,textarea{font-family:inherit;border:1.5px solid #dcd7ca;border-radi
 input:focus,select:focus,textarea:focus{border-color:#2e5d4e;box-shadow:0 0 0 3px rgba(46,93,78,0.12);}
 input[type=date]{cursor:pointer;}
 .overlay{position:fixed;inset:0;background:rgba(20,32,26,.55);z-index:200;display:flex;align-items:flex-end;justify-content:center;}
-.sheet{background:#fbf9f4;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;padding:24px 20px 40px;animation:slideUp .25s;}
-.detail-sheet{background:#fbf9f4;border-radius:20px 20px 0 0;width:100%;max-width:480px;height:88vh;overflow-y:auto;animation:slideUp .25s;}
+.sheet{background:#fbf9f4;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:calc(92vh / var(--zoom, 1));overflow-y:auto;padding:24px 20px 40px;animation:slideUp .25s;}
+.detail-sheet{background:#fbf9f4;border-radius:20px 20px 0 0;width:100%;max-width:480px;height:calc(88vh / var(--zoom, 1));overflow-y:auto;animation:slideUp .25s;}
 @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
@@ -688,6 +698,10 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [copyResult, setCopyResult] = useState(null)       // 献立コピー後の確認モーダル
   const [moveChecked, setMoveChecked] = useState(getMoveChecked)
+  const [fontScale, setFontScale] = useState(getFontScale)
+  const [showFontMenu, setShowFontMenu] = useState(false)
+  const changeFontScale = id => { setFontScale(id); saveFontScale(id); setShowFontMenu(false) }
+  const zoom = (FONT_SCALES.find(f => f.id === fontScale) || FONT_SCALES[0]).zoom
   const [syncStatus, setSyncStatus] = useState("connecting") // live | polling | connecting | paused
   const saveTimer = useRef(null)
   const isSaving = useRef(false)
@@ -1279,7 +1293,7 @@ export default function App() {
   ]
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f6f2e9", fontFamily: "'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN',sans-serif", color: "#1f2a24", display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div style={{ minHeight: zoom === 1 ? "100vh" : `calc(100vh / ${zoom})`, background: "#f6f2e9", fontFamily: "'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN',sans-serif", color: "#1f2a24", display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", position: "relative", ...(zoom !== 1 ? { zoom, "--zoom": zoom } : {}) }}>
       <style>{CSS}</style>
       {toast && <div className={`toast ${toast.type === "error" ? "error" : toast.type === "warn" ? "warn" : ""}`}>{toast.msg}</div>}
 
@@ -1289,8 +1303,28 @@ export default function App() {
           <div style={{ fontFamily: "'Zen Maru Gothic',sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>CookFlow</div>
           <div style={{ fontSize: 10, color: "#b5c9bd", whiteSpace: "nowrap" }}>{({ catalog: "レシピ", plan: "献立", seasoning: "調味料チェック", shopping: "買い物リスト", history: "履歴", settings: "設定" })[screen]}</div>
         </div>
+        <div style={{ marginLeft: "auto", position: "relative" }}>
+          <button aria-label="文字サイズ" aria-expanded={showFontMenu} onClick={() => setShowFontMenu(o => !o)}
+            style={{ height: 40, minWidth: 44, borderRadius: 12, border: "1.5px solid rgba(246,242,233,0.35)", cursor: "pointer", fontFamily: "inherit", background: showFontMenu ? "rgba(246,242,233,0.22)" : "transparent", color: "#f6f2e9", fontWeight: 700, padding: "0 8px", whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: 12 }}>あ</span><span style={{ fontSize: 17 }}>A</span>
+          </button>
+          {showFontMenu && <>
+            <div onClick={() => setShowFontMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
+            <div role="menu" style={{ position: "absolute", right: 0, top: 46, zIndex: 61, background: "#fff", borderRadius: 14, boxShadow: "0 8px 24px rgba(20,32,26,.22)", padding: 8, width: 190 }}>
+              <div style={{ fontSize: 11, color: "#7f8e85", fontWeight: 700, padding: "4px 8px 8px" }}>文字サイズ</div>
+              {FONT_SCALES.map(f => (
+                <button key={f.id} role="menuitemradio" aria-checked={fontScale === f.id} onClick={() => changeFontScale(f.id)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", border: "none", borderRadius: 10, padding: "10px", cursor: "pointer", fontFamily: "inherit", background: fontScale === f.id ? "#e9f0ea" : "transparent", color: "#1f2a24" }}>
+                  <span style={{ width: 30, textAlign: "center", fontWeight: 700, fontSize: Math.round(14 * f.zoom) }}>あ</span>
+                  <span style={{ flex: 1, textAlign: "left", fontSize: 14 }}>{f.label}</span>
+                  {fontScale === f.id && <span style={{ color: "#2e5d4e", fontWeight: 700 }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          </>}
+        </div>
         <button aria-label="設定" onClick={() => setScreen(screen === "settings" ? "catalog" : "settings")}
-          style={{ marginLeft: "auto", width: 40, height: 40, borderRadius: 12, border: "none", cursor: "pointer", fontSize: 19, background: screen === "settings" ? "rgba(246,242,233,0.22)" : "transparent", color: "#f6f2e9" }}>⚙️</button>
+          style={{ marginLeft: 6, width: 40, height: 40, borderRadius: 12, border: "none", cursor: "pointer", fontSize: 19, background: screen === "settings" ? "rgba(246,242,233,0.22)" : "transparent", color: "#f6f2e9" }}>⚙️</button>
       </header>
 
       <div className="screen" style={{ flex: 1 }}>
@@ -1715,6 +1749,18 @@ export default function App() {
               </form>
             </div>
 
+            <div className="settings-title">🔠 文字サイズ</div>
+            <div className="settings-section">
+              <div className="settings-row" style={{ gap: 8 }}>
+                {FONT_SCALES.map(f => (
+                  <button key={f.id} onClick={() => changeFontScale(f.id)} className={`pill-btn ${fontScale === f.id ? "active" : ""}`} style={{ flex: 1, padding: "8px 4px" }}>
+                    <span style={{ fontSize: Math.round(12 * f.zoom), fontWeight: 700, marginRight: 4 }}>あ</span>{f.label}
+                  </button>
+                ))}
+              </div>
+              <div className="settings-row" style={{ fontSize: 11, color: "#7f8e85" }}>この端末だけの設定です。ヘッダーの「あA」からも変えられます</div>
+            </div>
+
             <div className="settings-title">🛒 買い物リスト</div>
             <div className="settings-section">
               <div className="settings-row" onClick={() => { const v = !moveChecked; setMoveChecked(v); saveMoveChecked(v) }} style={{ cursor: "pointer" }}>
@@ -1978,7 +2024,12 @@ function PhotoCropper({ file, onCancel, onDone }) {
     setView(clamp({ scale: nextScale, x: cx - (cx - base.x) * r, y: cy - (cy - base.y) * r }))
   }
 
-  const localPoint = e => { const b = stageRef.current.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top } }
+  // 文字サイズで画面全体を拡大しているときは、画面上の座標と要素内の座標の比率で割り戻す
+  const localPoint = e => {
+    const el = stageRef.current, b = el.getBoundingClientRect()
+    const k = el.clientWidth ? b.width / el.clientWidth : 1
+    return { x: (e.clientX - b.left) / k, y: (e.clientY - b.top) / k }
+  }
   const startGesture = () => {
     const pts = [...pointers.current.values()]
     gesture.current = { view: viewRef.current, pts: pts.map(p => ({ ...p })) }
@@ -2052,8 +2103,8 @@ function PhotoCropper({ file, onCancel, onDone }) {
           </div>
         )}
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button className="btn btn-outline" style={{ flex: 1 }} onClick={onCancel}>キャンセル</button>
-          <button className="btn btn-primary" style={{ flex: 2, padding: "12px" }} disabled={!failed && !view} onClick={() => failed ? onDone(file) : confirm()}>
+          <button className="btn btn-outline" style={{ flex: 1, whiteSpace: "nowrap", padding: "11px 8px" }} onClick={onCancel}>キャンセル</button>
+          <button className="btn btn-primary" style={{ flex: 1.6, padding: "12px", whiteSpace: "nowrap" }} disabled={!failed && !view} onClick={() => failed ? onDone(file) : confirm()}>
             {failed ? "そのまま使う" : "この範囲で決定"}
           </button>
         </div>
