@@ -99,8 +99,8 @@ function clearSharedImport() { try { sessionStorage.removeItem(LS_PENDING_IMPORT
 // 検索用：カタカナ→ひらがな・小文字にそろえる
 function searchKey(s) { return String(s || "").toLowerCase().replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)) }
 const STORE_ORDER = ["野菜・果物","肉・魚","卵・乳製品","加工食品・大豆製品","乾物・麺類・パスタ","調味料","冷凍食品・その他"]
-// URL取り込みで、AIを使わずに読めることを確認したサイト（2026-09 時点）
-const SUPPORTED_SITES = ["クラシル", "デリッシュキッチン", "Nadia", "レタスクラブ", "味の素パーク", "みんなのきょうの料理", "E・レシピ", "楽天レシピ", "macaroni", "白ごはん.com", "リュウジのバズレシピ.com"]
+// URL取り込みで、AIを使わずに読めることを確認したサイト（2026-10 時点）
+const SUPPORTED_SITES = ["楽天レシピ", "Nadia", "クラシル", "デリッシュキッチン", "macaroni", "白ごはん.com", "レタスクラブ", "オレンジページnet", "みんなのきょうの料理", "E・レシピ", "味の素パーク", "キッコーマン", "キユーピー", "ミツカン", "ハウス食品", "ヤマサ", "つくおき", "リュウジのバズレシピ.com"]
 
 // ── 分数・数値変換 ──
 function parseAmount(val) {

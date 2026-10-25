@@ -6,7 +6,7 @@
 import { lookup } from "node:dns/promises"
 import net from "node:net"
 import {
-  extractJsonLdRecipe, extractCookpadRecipe, extractBazurecipe, bazurecipeFromContent, parsePlainRecipe, htmlToText, getYouTubeId, geminiExtract, cleanText,
+  extractJsonLdRecipe, extractMicrodataRecipe, kewpieSteps, extractCookpadRecipe, extractBazurecipe, bazurecipeFromContent, parsePlainRecipe, htmlToText, getYouTubeId, geminiExtract, cleanText,
 } from "./_recipe.js"
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -137,6 +137,18 @@ async function completeBazurecipe(bz) {
   return recipe
 }
 
+// 取り込んだレシピの「そろい具合」：分量つきの材料と作り方の数
+const withQty = r => r.ingredients.filter(i => i.amount || i.unit).length
+function isComplete(r) { return r.steps.length > 0 && r.ingredients.length >= 2 && withQty(r) >= r.ingredients.length / 2 }
+function recipeScore(r) { return withQty(r) * 2 + r.ingredients.length + Math.min(r.steps.length, 15) * 2 }
+
+// ページの本文部分（<main> か、いちばん大きい <article>）。無ければ null
+function mainContentHtml(html) {
+  const blocks = [...html.matchAll(/<(main|article)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map(m => m[2])
+  if (!blocks.length) return null
+  return blocks.sort((a, b) => b.length - a.length)[0]
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return }
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {})
@@ -213,15 +225,45 @@ export default async function handler(req, res) {
       const bz = extractBazurecipe(html)
       if (bz) { res.status(200).json({ recipe: { ...(await completeBazurecipe(bz)), url }, source: "bazurecipe" }); return }
     }
+    const title = cleanText((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "")
     const fromLd = extractJsonLdRecipe(html)
-    if (fromLd && fromLd.ingredients.length) {
+    // JSON-LD が十分（作り方があり、半分以上の材料に分量がある）ならそれを使う
+    if (fromLd && isComplete(fromLd)) {
       res.status(200).json({ recipe: { ...fromLd, url }, source: "jsonld" })
       return
     }
-    // 本文に「材料」「作り方」がテキストで書かれていれば AI なしで読む
-    const title = cleanText((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "")
-    const plain = parsePlainRecipe(htmlToText(html, 60000), title.split(/\s+[-|｜]\s+/)[0], { preferTitle: true })
-    if (plain) { res.status(200).json({ recipe: { ...plain, url }, source: "text" }); return }
+    // JSON-LD が無い・不完全なサイト（キユーピー・つくおき・ヤマサなど）は、microdata と本文の文章も読み、
+    // いちばん内容がそろっているものを使う
+    const candidates = [
+      fromLd && fromLd.ingredients.length ? { recipe: fromLd, source: "jsonld" } : null,
+      (() => { const r = extractMicrodataRecipe(html); return r ? { recipe: r, source: "microdata" } : null })(),
+      (() => {
+        // 本文（main / article）があればそこを優先して読む。広告・おすすめ欄などを拾いにくくなる
+        const shortTitle = title.split(/\s+[-|｜]\s+/)[0]
+        for (const region of [mainContentHtml(html), html]) {
+          if (!region) continue
+          const r = parsePlainRecipe(htmlToText(region, 60000), shortTitle, { preferTitle: true })
+          if (r) return { recipe: r, source: "text" }
+        }
+        return null
+      })(),
+    ].filter(Boolean)
+    if (candidates.length) {
+      // キユーピーは手順の本文だけを取り直す（本文の文章からだとコツの欄も混ざるため）
+      if (/(^|\.)kewpie\.co\.jp$/.test(host)) {
+        const ks = kewpieSteps(html)
+        if (ks.length) candidates.forEach(c => { c.recipe.steps = ks })
+      }
+      const structured = candidates.find(c => c.source !== "text" && isComplete(c.recipe))
+      const best = structured || candidates.sort((a, b) => recipeScore(b.recipe) - recipeScore(a.recipe))[0]
+      // 料理名・人数は JSON-LD のほうが正確なことが多いので、あればそちらを使う
+      if (fromLd && best.source !== "jsonld") {
+        if (fromLd.name) best.recipe.name = fromLd.name
+        if (fromLd.servings) best.recipe.servings = fromLd.servings
+      }
+      res.status(200).json({ recipe: { ...best.recipe, url }, source: best.source })
+      return
+    }
     if (!apiKey) return noKey()
     const recipe = await geminiExtract({ apiKey, model, text: `ページタイトル: ${title}\n\n本文:\n${htmlToText(html)}` })
     if (!recipe) { res.status(422).json({ error: "このページからレシピを読み取れませんでした" }); return }

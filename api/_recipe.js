@@ -26,7 +26,7 @@ const UNITS = "kg|g|ml|mL|cc|L|l|カップ|個|コ|本|枚|片|かけ|玉|袋|�
 // 分量のうしろに付く言葉（「大さじ3強」「320gほど」）
 const QTY_SUFFIX = "(?:強|弱|ほど|程度|くらい|ぐらい|分)?"
 const NUM = "\\d+(?:\\.\\d+)?(?:\\/\\d+)?(?:と\\d+\\/\\d+)?"
-const VAGUE = "少々|適量|適宜|ひとつまみ|少量|お好みで|お好み|各適量|各少々"
+const VAGUE = "少々|適量|適宜|ひとつまみ|ひとかけ|ひと片|ひとにぎり|ひとつかみ|少量|お好みで|お好み|各適量|各少々"
 // 「大1/2」「小1」の省略形は、数字のあとが行末・空白・括弧のときだけ（「小1節」「大根」「小松菜」は対象外）
 const QTY_RE = new RegExp(
   `(${SPOON})\\s*(${NUM})|(大|小)(${NUM})(?=$|[\\s(（、,])|(${NUM})\\s*(${UNITS})?|(${VAGUE})`)
@@ -58,6 +58,12 @@ function stripLineMarks(s) {
     .trim()
 }
 
+// 材料でも作り方でもない、レシピの情報の行（「調理時間：10分」「冷蔵保存：4日」「エネルギー 540kcal」など）
+const META_LINE_RE = /^(調理時間|所要時間|準備時間|保存期間|冷蔵保存|冷凍保存|保存|エネルギー|カロリー|熱量|塩分|食塩相当量|野菜摂取量|たんぱく質|脂質|炭水化物|糖質|人数|費用|目安|難易度|分量)\s*[:：(（]?/
+
+// 行末の分量（うしろのカッコ書き「(約200g)」は許す）
+const QTY_AT_END_RE = new RegExp(`(?:${QTY_RE.source})${QTY_SUFFIX}\\s*(?:[(（][^)）]*[)）])?\\s*$`)
+
 // 1行 → 材料の配列（「粉チーズ、牛乳…各大さじ1」は2件に分ける）。材料でない行は []
 export function parseIngredientLines(line) {
   const raw = normalizeQtyText(line)
@@ -66,12 +72,17 @@ export function parseIngredientLines(line) {
   if (/^[〈<＜【\[［][^〉>＞】\]］]*[〉>＞】\]］]/.test(raw)) return []
   const s = stripLineMarks(raw)
   if (!s) return []
-  const m = s.match(QTY_RE)
+  // 行末の分量を優先（「中華スープの素（メモ1）小1.5」のカッコ内の数字を分量と取り違えない）
+  if (META_LINE_RE.test(s)) return []
+  const m = s.match(QTY_AT_END_RE) || s.match(QTY_RE)
   let name, qty
   if (!m || m.index === 0) { name = s; qty = { amount: "", unit: "" } }
   else {
     name = s.slice(0, m.index)
     qty = qtyFromMatch(m)
+    // 「玉ねぎ 中2個 400g」のように分量が2つ並ぶときは、前のほうを分量にする（うしろはグラム換算）
+    const m2 = name.replace(/\s+$/, "").match(QTY_AT_END_RE)
+    if (m2 && m2.index > 0 && /\s$/.test(name)) { qty = qtyFromMatch(m2); name = name.replace(/\s+$/, "").slice(0, m2.index) }
   }
   const each = /各\s*$/.test(name) || (m && /^各/.test(m[0]))
   name = name.replace(/各\s*$/, "").replace(/[\s…:：・.、,]+$/, "")
@@ -103,6 +114,7 @@ const SEPARATOR_RE = /^[ー―─━=＝\-~〜～]{3,}$/
 // loose: 材料の欄を読んでいる途中なら「名前…分量」の形も材料として受け入れる
 function asIngredientLine(line, { loose = false } = {}) {
   const s = stripLineMarks(normalizeQtyText(line))
+  if (META_LINE_RE.test(s)) return null
   if (!s || s.length > 40 || /[。]/.test(s) || /https?:/.test(s)) return null
   const m = s.match(new RegExp(`(?:${QTY_RE.source})${QTY_SUFFIX}\\s*(?:[(（][^)）]*[)）])?\\s*$`))
   if (!m || m.index === 0) {
@@ -129,15 +141,46 @@ function isHeadingLine(l) {
   return l.length < 25 && !/[。、！!]/.test(l) && /(\/|作り方|レシピ|下ごしらえ|のコツ|ポイント|スポンサー|広告|^PR$)/.test(l)
 }
 
+// 分量だけの行（「1枚」「大さじ1」「小さじ」「1/2」「適量」）
+const QTY_ONLY_RE = new RegExp(`^(?:(?:${QTY_RE.source})${QTY_SUFFIX}|大さじ|小さじ|カップ|${NUM})\\s*(?:[(（][^)）]*[)）])?$`)
+const QTY_END_PLAIN_RE = new RegExp(`(?:${QTY_RE.source})${QTY_SUFFIX}\\s*$`)
+
+// 材料の欄で、名前と分量が別の行に分かれているページ（「鶏もも肉 ⏎ 1枚 ⏎ 250g」「小さじ ⏎ 1/2」）を1行にまとめる
+function joinQuantityLines(raw) {
+  const out = []
+  let inIng = false
+  for (const l of raw) {
+    const hw = toHalfWidth(l)
+    if (STEP_HEADER_RE.test(hw)) inIng = false
+    else if (isIngHeader(hw)) inIng = true
+    const prev = out.length - 1
+    if (inIng && l && prev >= 0 && out[prev] && out[prev].length <= 30 && !isIngHeader(toHalfWidth(out[prev])) && QTY_ONLY_RE.test(normalizeQtyText(l))) {
+      const p = out[prev]
+      // 前の行がもう分量で終わっていれば（「1枚」のあとの「250g」）カッコ書きで足す
+      const pEndsQty = QTY_END_PLAIN_RE.test(normalizeQtyText(p)) && !/(大さじ|小さじ|カップ)$/.test(p)
+      out[prev] = pEndsQty ? `${p}(${l})` : `${p} ${l}`
+      continue
+    }
+    out.push(l)
+  }
+  return out
+}
+
+// 作り方のあとに続く、レシピ以外の欄の見出し（ここで読み取りを終える）
+const AFTER_STEPS_RE = /^(\[?豆知識|裏ワザ|アレンジ|バリエーション|関連|この記事|このレシピ(に|を|の作者|へ)|おすすめ|人気|ランキング|PR$|広告|シェア|コメント|こちらもおすすめ|レシピ一覧|前の|次の|タグ|カテゴリ|著者|監修|クッキングレポ|つくれぽ|お料理メモ|よくある質問|Q&A|あわせて読みたい|同じ|似ている|新着|特集|もっと見る|この商品|商品情報|使用した商品|ご購入|SNS|フォロー)/
+// 作り方に混ぜない行（写真のクレジットなど）
+const SKIP_LINE_RE = /^(Photo by|photo:|写真[:：]|画像[:：]|出典[:：]|\(?撮影)/i
+
 // preferTitle: Webページ全体から読むときは、材料の直前の行よりページタイトルを料理名に使う
 // allowNoSteps: 作り方が無くても材料が取れればレシピとして返す（呼び出し側で動画の概要欄などから補う）
 export function parsePlainRecipe(text, title = "", { preferTitle = false, allowNoSteps = false } = {}) {
-  const lines = String(text).split(/\r?\n/).map(l => l.trim())
+  const lines = joinQuantityLines(String(text).split(/\r?\n/).map(l => l.trim()))
   const ingredients = []
   const steps = []
   const memos = []
-  let section = "none" // none | ing | steps | done
+  let section = "none" // none | ing | afterIng | steps | done
   let firstIngIdx = -1
+  let nextIsNewStep = false
 
   for (let i = 0; i < lines.length && section !== "done"; i++) {
     const line = lines[i]
@@ -170,16 +213,28 @@ export function parsePlainRecipe(text, title = "", { preferTitle = false, allowN
         if (/^※/.test(line)) continue
         // 「▼詳しい作り方は動画をご覧ください」：本文に作り方は無いのでここで終わり
         if (/^[▼▽]/.test(line)) { section = "done"; continue }
+        // 少し先に「作り方」の見出しがあれば、それまでの行（「このレシピは〇〇を使っています」など）は飛ばす
+        if (lines.slice(i + 1, i + 9).some(l => STEP_HEADER_RE.test(toHalfWidth(l)))) continue
+        if (lines.slice(i + 1, i + 3).some(l => l && asIngredientLine(l, { loose: true }))) continue
+        if (META_LINE_RE.test(hw)) continue
+        if (AFTER_STEPS_RE.test(hw) || SKIP_LINE_RE.test(hw) || /^\d{1,2}$/.test(hw)) continue
         // 材料のあとに来た文は作り方として扱う
         if (line.length >= 6 || STEP_NUM_RE.test(hw)) { section = "steps" } else continue
       } else continue
     }
     if (section === "steps") {
       if (/^[★☆]/.test(line) && !STEP_NUM_RE.test(hw)) { memos.push(line.replace(/^[★☆]\s*/, "")); continue }
-      if (/^※/.test(line) || isHeadingLine(hw)) continue
-      // 「▼詳しい作り方は動画をご覧ください」などの案内で終わり
+      if (steps.length && AFTER_STEPS_RE.test(hw)) { section = "done"; continue }
+      if (/^※/.test(line) || isHeadingLine(hw) || SKIP_LINE_RE.test(hw) || META_LINE_RE.test(hw)) continue
+      // 「▼詳しい作り方は動画をご覧ください」などの案内や、コメント・おすすめ欄で終わり
       if (/^[▼▽→]/.test(line)) { section = "done"; continue }
-      const numbered = STEP_NUM_RE.test(hw)
+      if (steps.length && AFTER_STEPS_RE.test(hw)) { section = "done"; continue }
+      // 次のレシピの材料が始まったら終わり
+      if (steps.length && isIngHeader(hw)) { section = "done"; continue }
+      // 手順番号だけの行（「1」「2」）は番号として扱い、次の行を新しい手順にする
+      if (/^\d{1,2}$/.test(hw)) { nextIsNewStep = true; continue }
+      const numbered = STEP_NUM_RE.test(hw) || nextIsNewStep
+      nextIsNewStep = false
       const step = hw.replace(STEP_NUM_RE, "").trim()
       if (!step) continue
       // 改行で文の途中が切れている（前の行が「、」で終わる）ときはつなげる
@@ -187,6 +242,7 @@ export function parsePlainRecipe(text, title = "", { preferTitle = false, allowN
       else steps.push(step)
     }
   }
+  if (steps.length > 40) steps.length = 40 // 念のため、ページの余計な文を大量に拾わないように
   if (ingredients.length < 2 || (!steps.length && !allowNoSteps)) return null
 
   // 料理名：材料の直前にある見出し（【鶏胸肉のレモン漬け】など）→ タイトルの【】→ タイトル
@@ -201,12 +257,15 @@ export function parsePlainRecipe(text, title = "", { preferTitle = false, allowN
     name = ((title.match(/【([^】]+)】\s*$/) || [])[1] || title)
       .replace(/\s*[\/／:：|｜].*$/, "").replace(/の?(レシピ|作り方)$/, "").trim()
   }
-  const servings = parseInt((toHalfWidth(text).match(/(\d+)\s*人(?:前|分)/) || [])[1], 10) || null
+  const hwText = toHalfWidth(text)
+  // 「材料（2人分）」を優先。「1-2人前」のような範囲は多いほうを使う
+  const sm = hwText.match(/材料\s*[(（【]?\s*(\d+)\s*(?:[〜~～-]\s*(\d+))?\s*人(?:前|分)/) || hwText.match(/(\d+)\s*(?:[〜~～-]\s*(\d+))?\s*人(?:前|分)(?!の値)/)
+  const servings = sm ? Number(sm[2] || sm[1]) || null : null
   return {
     name,
     servings,
     memo: memos.join(" ").slice(0, 200),
-    ingredients: ingredients.map(i => ({ ...i, isSeasoning: null })),
+    ingredients: dropGroupLabels(ingredients).map(i => ({ ...i, isSeasoning: null })),
     steps,
   }
 }
@@ -232,14 +291,30 @@ function flattenInstructions(ins) {
   if (Array.isArray(ins)) return ins.flatMap(flattenInstructions)
   if (ins.itemListElement) return flattenInstructions(ins.itemListElement)
   const t = ins.text || ins.name
-  return t ? [cleanText(t).replace(/\s*\n\s*/g, " ").trim()].filter(Boolean) : []
+  if (!t) return []
+  const txt = toHalfWidth(cleanText(t))
+  // 番号が 1, 2, 3… と順に出てくる位置だけで区切る（手順の中の「[2]を並べる」のような参照では区切らない）
+  const cuts = []
+  let expect = 1
+  for (const m of txt.matchAll(/\[(\d{1,2})\]|［(\d{1,2})］|([①-⑳])|（(\d{1,2})）/g)) {
+    const n = m[3] ? m[3].charCodeAt(0) - 0x245f : Number(m[1] || m[2] || m[4])
+    if (n === expect) { cuts.push({ at: m.index, len: m[0].length }); expect++ }
+  }
+  if (cuts.length >= 2) {
+    return cuts.map((c, i) => txt.slice(c.at + c.len, i + 1 < cuts.length ? cuts[i + 1].at : undefined))
+      .map(x => x.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean)
+  }
+  return [txt.replace(/\s*\n\s*/g, " ").trim()].filter(Boolean)
 }
 
 export function extractJsonLdRecipe(html) {
   const blocks = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
   for (const b of blocks) {
     let data
-    try { data = JSON.parse(b[1].trim()) } catch { continue }
+    try { data = JSON.parse(b[1].trim()) }
+    catch {
+      try { data = JSON.parse(b[1].trim().replace(/[\u0000-\u001f]+/g, " ")) } catch { continue }
+    }
     const r = findRecipeNode(data)
     if (!r) continue
     const ingredients = (Array.isArray(r.recipeIngredient) ? r.recipeIngredient : r.recipeIngredient ? [r.recipeIngredient] : [])
@@ -253,11 +328,49 @@ export function extractJsonLdRecipe(html) {
       name: cleanText(r.name || ""),
       servings,
       memo: "",
-      ingredients: ingredients.map(i => ({ ...i, isSeasoning: null })),
+      ingredients: dropGroupLabels(ingredients).map(i => ({ ...i, isSeasoning: null })),
       steps,
     }
   }
   return null
+}
+
+// ── microdata（itemprop="recipeIngredient" など）で書かれたレシピ（ヤマサなど）──
+export function extractMicrodataRecipe(html) {
+  if (!/itemprop=["'](recipeIngredient|ingredients)["']/.test(html)) return null
+  // 表のセルは区切りの空白を入れてから文字にする（「焼き芋」「1本」が「焼き芋1本」とつながるように）
+  const textOf = h => cleanText(String(h).replace(/<\/(td|th|dt|dd)>/gi, " </$1>"))
+  const items = []
+  for (const m of html.matchAll(/<(tr|li|span|p|dd|div)\b[^>]*itemprop=["'](?:recipeIngredient|ingredients)["'][^>]*>([\s\S]*?)<\/\1>/gi)) {
+    if (/itemprop=["'](recipeIngredient|ingredients)["']/.test(m[2])) continue // 中に材料を含む入れ物は除く
+    items.push(...parseIngredientLines(textOf(m[2])))
+  }
+  let steps = []
+  const at = html.search(/itemprop=["']recipeInstructions["']/)
+  if (at >= 0) {
+    const seg = html.slice(at, at + 20000)
+    const list = seg.match(/<(ol|ul)\b[\s\S]*?<\/\1>/i)
+    steps = list
+      ? [...list[0].matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map(m => cleanText(m[1]).replace(/\s*\n\s*/g, " ")).filter(Boolean)
+      : flattenInstructions(cleanText(seg.slice(seg.indexOf(">") + 1).split(/<\/(section|div|article)>/i)[0]))
+  }
+  const ingredients = dropGroupLabels(items.filter(i => i.name)).map(i => ({ ...i, isSeasoning: null }))
+  if (ingredients.length < 2) return null
+  const name = cleanText((html.match(/itemprop=["']name["'][^>]*>([^<]{1,80})</) || [])[1] || (html.match(/<meta property="og:title" content="([^"]*)"/) || [])[1] || "")
+  const yieldText = toHalfWidth(cleanText((html.match(/itemprop=["']recipeYield["'][^>]*?(?:content=["']([^"']*)["'][^>]*)?>([^<]{0,20})/) || []).slice(1).join(" ")))
+  return { name, servings: parseInt((yieldText.match(/\d+/) || [])[0], 10) || null, memo: "", ingredients, steps: steps.slice(0, 40) }
+}
+
+// 分量のない「A」「煮汁」「具」「合わせ調味料」「トッピング」などは、材料ではなくグループの見出し
+const GROUP_LABEL_RE = /^([A-Za-zＡ-Ｚ]|合わせ調味料|調味料|煮汁|具|具材|衣|ころも|.{0,4}ごろも|トッピング|下味|つけだれ|かけだれ|漬けだれ|たれ|タレ|飾り|仕上げ|生地|あん|皮|マリネ液|ピクルス液|つけあわせ|付け合わせ|薬味|メイン|その他)$/
+export function dropGroupLabels(list) {
+  return list.filter(i => !(!i.amount && !i.unit && GROUP_LABEL_RE.test(String(i.name).trim())))
+}
+
+// ── キユーピー：手順の本文だけを読む（コツの欄「r-point」は入れない）──
+export function kewpieSteps(html) {
+  return [...html.matchAll(/<p class="r-recipe-hdg--order">([\s\S]*?)<\/p>/g)]
+    .map(m => cleanText(m[1]).replace(/\s*\n\s*/g, " ").trim()).filter(Boolean)
 }
 
 // ── クックパッド（JSON-LD がないため HTML から読む）──
@@ -266,7 +379,13 @@ export function extractCookpadRecipe(html) {
   const flat = html.replace(/\n/g, " ")
   const ingredients = [...flat.matchAll(/<li id="ingredient_\d+"[^>]*class="([^"]*)"[^>]*>\s*<span>([\s\S]*?)<\/span>\s*(?:<bdi[^>]*>([\s\S]*?)<\/bdi>)?/g)]
     .filter(m => !/\bheadline\b/.test(m[1].replace("not-headline", "")))
-    .map(m => ({ name: cleanText(m[2]).replace(/^[・●○◯◎☆★◆◇■□※]+\s*/, ""), ...parseQuantity(m[3] || ""), isSeasoning: null }))
+    .map(m => {
+      const name = cleanText(m[2]).replace(/^[・●○◯◎☆★◆◇■□※]+\s*/, "")
+      const qty = cleanText(m[3] || "")
+      // 分量の欄が空で「鶏もも肉 300g」のように名前の欄にまとめて書かれているレシピもある
+      if (!qty) { const one = parseIngredientLines(name)[0]; if (one) return { ...one, isSeasoning: null } }
+      return { name, ...parseQuantity(qty), isSeasoning: null }
+    })
     .filter(i => i.name)
   const steps = [...flat.matchAll(/id="step_\d+"[^>]*>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/g)]
     .map(m => cleanText(m[1])).filter(Boolean)
