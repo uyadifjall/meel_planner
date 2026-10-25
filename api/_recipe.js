@@ -38,10 +38,11 @@ function qtyFromMatch(m) {
   return { amount: "", unit: m[7] }
 }
 
-// 表記の前処理：半角化・「約」・範囲「4〜6個」→「4個」・「大さじ1と小さじ1」→「小さじ4」
+// 表記の前処理：半角化・「約」・範囲「4〜6個」→「4個」・「大さじ1と小さじ1」→「小さじ4」・「大さじ1×2回」→「大さじ2」
 function normalizeQtyText(s) {
   return toHalfWidth(cleanText(s)).replace(/\s+/g, " ").trim()
     .replace(/約\s*(?=\d)/g, "")
+    .replace(/(\d+(?:\.\d+)?)\s*[×xX＊*]\s*(\d+(?:\.\d+)?)\s*回(分)?/g, (_, a, b) => String(Math.round(Number(a) * Number(b) * 100) / 100))
     .replace(/(\d+(?:\.\d+)?(?:\/\d+)?)\s*[〜~～]\s*\d+(?:\.\d+)?(?:\/\d+)?/g, "$1")
     .replace(/大さじ(\d+)\s*と\s*小さじ(\d+)/g, (_, a, b) => `小さじ${Number(a) * 3 + Number(b)}`)
 }
@@ -60,7 +61,7 @@ function stripLineMarks(s) {
 // 1行 → 材料の配列（「粉チーズ、牛乳…各大さじ1」は2件に分ける）。材料でない行は []
 export function parseIngredientLines(line) {
   const raw = normalizeQtyText(line)
-  if (!raw || /^※/.test(raw)) return []
+  if (!raw || /^※/.test(raw) || /レシピID|https?:/.test(raw)) return []
   // 〈ずんだあん〉〈タレ〉のようなグループ見出し
   if (/^[〈<＜【\[［][^〉>＞】\]］]*[〉>＞】\]］]/.test(raw)) return []
   const s = stripLineMarks(raw)
@@ -99,11 +100,21 @@ const STEP_HEADER_RE = /^[【\[■◆●<＜〈(（]?\s*(作り方|作りかた|
 const SEPARATOR_RE = /^[ー―─━=＝\-~〜～]{3,}$/
 
 // 行の最後が分量で終わっていれば材料行とみなす（「胸肉320gを薄切りにし…」のような文は除外）
-function asIngredientLine(line) {
+// loose: 材料の欄を読んでいる途中なら「名前…分量」の形も材料として受け入れる
+function asIngredientLine(line, { loose = false } = {}) {
   const s = stripLineMarks(normalizeQtyText(line))
   if (!s || s.length > 40 || /[。]/.test(s) || /https?:/.test(s)) return null
   const m = s.match(new RegExp(`(?:${QTY_RE.source})${QTY_SUFFIX}\\s*(?:[(（][^)）]*[)）])?\\s*$`))
-  if (!m || m.index === 0) return null
+  if (!m || m.index === 0) {
+    // 「名前…分量」の形なら、分量が見慣れない書き方でも材料として扱う（例「油…大さじ1を2回」「卵…L玉」）
+    // ここで材料と判定できないと、以降の材料がすべて作り方に入ってしまうため
+    const sep = loose && s.match(/^(.{1,20}?)\s*(?:…+|\.{2,}|‥+|・{2,}|:|：)\s*(.{1,20})$/)
+    if (sep && !/[をにでがはへ]\S*(する|入れ|切|混ぜ)/.test(sep[1])) {
+      const name = sep[1].trim()
+      if (name) return [{ name, ...parseQuantity(sep[2]) }]
+    }
+    return null
+  }
   const before = s.slice(0, m.index)
   if (!before.replace(/[\s…:：・.、,各約]/g, "") || before.length > 25) return null
   if (/[をにでがはへ]\S*(する|入れ|切|混ぜ)/.test(before)) return null
@@ -119,7 +130,8 @@ function isHeadingLine(l) {
 }
 
 // preferTitle: Webページ全体から読むときは、材料の直前の行よりページタイトルを料理名に使う
-export function parsePlainRecipe(text, title = "", { preferTitle = false } = {}) {
+// allowNoSteps: 作り方が無くても材料が取れればレシピとして返す（呼び出し側で動画の概要欄などから補う）
+export function parsePlainRecipe(text, title = "", { preferTitle = false, allowNoSteps = false } = {}) {
   const lines = String(text).split(/\r?\n/).map(l => l.trim())
   const ingredients = []
   const steps = []
@@ -133,7 +145,17 @@ export function parsePlainRecipe(text, title = "", { preferTitle = false } = {})
     const hw = toHalfWidth(line)
     if (STEP_HEADER_RE.test(hw)) { section = "steps"; continue }
     if (isIngHeader(hw)) { section = "ing"; continue }
-    if (SEPARATOR_RE.test(hw)) { if (steps.length) section = "done"; continue }
+    if (SEPARATOR_RE.test(hw)) {
+      if (steps.length) section = "done"
+      // 材料の直後の区切り線：次が「作り方」見出しか番号付きの手順でなければ、そこで終わり
+      // （「高評価＆チャンネル登録お願いします！」などを作り方として拾わないように）
+      else if (section === "ing" && ingredients.length) section = "afterIng"
+      continue
+    }
+    if (section === "afterIng") {
+      if (STEP_NUM_RE.test(hw)) section = "steps"
+      else { section = "done"; continue }
+    }
     // 【YouTube】【アプリリンク】など別の見出しが来たら終わり
     if (/^【[^】]*】$/.test(hw) && (steps.length || (section === "ing" && ingredients.length))) {
       if (steps.length) { section = "done"; continue }
@@ -141,11 +163,13 @@ export function parsePlainRecipe(text, title = "", { preferTitle = false } = {})
     if (/^https?:\/\//.test(hw)) { if (steps.length) section = "done"; continue }
 
     if (section !== "steps") {
-      const ing = asIngredientLine(line)
+      const ing = asIngredientLine(line, { loose: section === "ing" })
       if (ing) { if (firstIngIdx < 0) firstIngIdx = i; ingredients.push(...ing); section = "ing"; continue }
       if (section === "ing" && ingredients.length) {
         if (/^[★☆]/.test(line)) { memos.push(line.replace(/^[★☆]\s*/, "")); continue }
         if (/^※/.test(line)) continue
+        // 「▼詳しい作り方は動画をご覧ください」：本文に作り方は無いのでここで終わり
+        if (/^[▼▽]/.test(line)) { section = "done"; continue }
         // 材料のあとに来た文は作り方として扱う
         if (line.length >= 6 || STEP_NUM_RE.test(hw)) { section = "steps" } else continue
       } else continue
@@ -154,7 +178,7 @@ export function parsePlainRecipe(text, title = "", { preferTitle = false } = {})
       if (/^[★☆]/.test(line) && !STEP_NUM_RE.test(hw)) { memos.push(line.replace(/^[★☆]\s*/, "")); continue }
       if (/^※/.test(line) || isHeadingLine(hw)) continue
       // 「▼詳しい作り方は動画をご覧ください」などの案内で終わり
-      if (/^[▼▽→]/.test(line)) { if (steps.length) section = "done"; continue }
+      if (/^[▼▽→]/.test(line)) { section = "done"; continue }
       const numbered = STEP_NUM_RE.test(hw)
       const step = hw.replace(STEP_NUM_RE, "").trim()
       if (!step) continue
@@ -163,7 +187,7 @@ export function parsePlainRecipe(text, title = "", { preferTitle = false } = {})
       else steps.push(step)
     }
   }
-  if (ingredients.length < 2 || !steps.length) return null
+  if (ingredients.length < 2 || (!steps.length && !allowNoSteps)) return null
 
   // 料理名：材料の直前にある見出し（【鶏胸肉のレモン漬け】など）→ タイトルの【】→ タイトル
   let name = ""
@@ -259,24 +283,30 @@ export function extractBazurecipe(html) {
   const start = html.indexOf('<section class="content">')
   if (start < 0) return null
   const endMark = html.indexOf("CONTENT END", start)
-  const body = html.slice(start, endMark > 0 ? endMark : start + 60000)
-    .replace(/<(figure|blockquote|script|button)[\s\S]*?<\/\1>/gi, " ")
+  // 「<!-- CONTENT END -->」の途中で切ると「<!--」が残るので、コメントの開始位置で切る
+  const cut = endMark > 0 ? html.lastIndexOf("<!--", endMark) : -1
+  const body = html.slice(start, cut > start ? cut : endMark > 0 ? endMark : start + 60000)
     .replace(/<div class='ai-viewports[^>]*><\/div>/g, " ")
   const title = decodeEntities((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "").split(/\s+[-|｜]\s+/)[0]
   return bazurecipeFromContent(body, title)
 }
 
 // 記事本文の HTML（WordPress API の content.rendered でも可）から読む
+// 本文に作り方が無い（「▼詳しい作り方は動画をご覧ください」だけ）ときは steps が空で、videoId を付けて返す
 export function bazurecipeFromContent(contentHtml, title) {
-  const body = String(contentHtml).replace(/<(figure|blockquote|script|button)[\s\S]*?<\/\1>/gi, " ")
-  const recipe = parsePlainRecipe(htmlToText(body, 20000), title)
-  if (recipe && title) recipe.name = title
-  return recipe
+  const html = String(contentHtml)
+  const videoId = (html.match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]{6,})/) || [])[1] || null
+  const body = html.replace(/<(figure|blockquote|script|button)[\s\S]*?<\/\1>/gi, " ")
+  const recipe = parsePlainRecipe(htmlToText(body, 20000), title, { allowNoSteps: true })
+  if (!recipe) return null
+  if (title) recipe.name = title
+  return { ...recipe, videoId }
 }
 
 // ページ本文をAIに渡すためのテキスト化
 export function htmlToText(html, max = 15000) {
   const body = html
+    .replace(/<!--[\s\S]*?-->/g, " ") // HTML のコメントが文字として残らないように
     .replace(/<(script|style|noscript|svg|nav|footer|header|iframe)[\s\S]*?<\/\1>/gi, " ")
     .replace(/<(br|p|div|li|h\d|tr)[^>]*>/gi, "\n")
   return cleanText(body).slice(0, max)

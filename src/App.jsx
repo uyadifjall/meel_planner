@@ -75,6 +75,27 @@ function stableStringify(v) {
   return JSON.stringify(v ?? null)
 }
 
+// 文章から最初の URL を取り出す（LINE などからの共有は「レシピ名 https://…」の形が多い）
+function extractUrl(text) { const m = String(text || "").match(/https?:\/\/[^\s<>"'）)」』]+/); return m ? m[0] : "" }
+
+// 共有・ショートカットから開かれたとき（/?import=URL、Android の共有は ?url= / ?text= / ?title=）の取り込み先
+const LS_PENDING_IMPORT = "kondate_pending_import"
+function readSharedImport() {
+  try {
+    const p = new URLSearchParams(window.location.search)
+    // ショートカットでは「?import=」のあとに共有された URL をそのままつなぐので、& などで切れないよう残り全部を使う
+    const q = window.location.search
+    const i = q.indexOf("import=")
+    let rawImport = ""
+    if (i >= 0) { rawImport = q.slice(i + 7); try { rawImport = decodeURIComponent(rawImport) } catch {} }
+    const found = extractUrl([rawImport, ...["url", "text", "title"].map(k => p.get(k) || "")].join(" "))
+    if ([...p.keys()].some(k => ["import", "url", "text", "title"].includes(k))) window.history.replaceState(null, "", window.location.pathname)
+    if (found) { sessionStorage.setItem(LS_PENDING_IMPORT, found); return found }
+    return sessionStorage.getItem(LS_PENDING_IMPORT) || ""
+  } catch { return "" }
+}
+function clearSharedImport() { try { sessionStorage.removeItem(LS_PENDING_IMPORT) } catch {} }
+
 // 検索用：カタカナ→ひらがな・小文字にそろえる
 function searchKey(s) { return String(s || "").toLowerCase().replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)) }
 const STORE_ORDER = ["野菜・果物","肉・魚","卵・乳製品","加工食品・大豆製品","乾物・麺類・パスタ","調味料","冷凍食品・その他"]
@@ -702,6 +723,7 @@ export default function App() {
   const [addManualInput, setAddManualInput] = useState("")
   const [toast, setToast] = useState(null)
   const [copyResult, setCopyResult] = useState(null)       // 献立コピー後の確認モーダル
+  const [sharedImport, setSharedImport] = useState(readSharedImport) // 共有・ショートカットから渡されたレシピの URL
   const [moveChecked, setMoveChecked] = useState(getMoveChecked)
   const [fontScale, setFontScale] = useState(getFontScale)
   const [showFontMenu, setShowFontMenu] = useState(false)
@@ -743,6 +765,13 @@ export default function App() {
   // 自分の変更がまだ保存されていない間は、他の端末のデータで上書きしない
   const unsavedChanges = useRef(false)
   const saveSeq = useRef(0)
+
+  // ── 共有・ショートカットから開かれたら、ログイン後にレシピ追加を開いて取り込む ──
+  useEffect(() => {
+    if (!userId || !sharedImport) return
+    clearSharedImport() // 再読み込みで何度も取り込まないように
+    setEditRecipe(null); setDetailRecipe(null); setScreen("catalog"); setShowRegister(true)
+  }, [userId, sharedImport])
 
   // ── 起動時に自動ログイン ──
   useEffect(() => {
@@ -963,6 +992,7 @@ export default function App() {
     setRecipes(next); triggerSave(buildSave({ recipes: next }))
   }
   const saveRecipe = recipe => {
+    setSharedImport("")
     // 写真を差し替え・削除した場合は古いファイルを Storage から消す
     const prev = recipe.id ? recipes.find(r => r.id === recipe.id) : null
     if (prev?.photoPath && prev.photoPath !== recipe.photoPath) deleteRecipePhoto(prev.photoPath).catch(() => {})
@@ -1777,6 +1807,36 @@ export default function App() {
               <div className="settings-row" style={{ fontSize: 11, color: "#7f8e85" }}>この端末だけの設定です。ヘッダーの「あA」からも変えられます</div>
             </div>
 
+            <div className="settings-title">📲 ほかのアプリから取り込む</div>
+            <div className="settings-section">
+              <div className="settings-row" style={{ display: "block", fontSize: 13, lineHeight: 1.7 }}>
+                <b>いちばん簡単な方法</b><br />
+                LINE やブラウザでレシピの「リンクをコピー」→ CookFlow の ＋（レシピ追加）→「📋 コピーしたURLを貼り付けて取り込む」
+              </div>
+              <div className="settings-row" style={{ display: "block", fontSize: 13, lineHeight: 1.7 }}>
+                <b>Android</b><br />
+                ホーム画面に追加した CookFlow が、共有メニューの送り先に「CookFlow」として出ます。出ないときは、ホーム画面のアイコンを一度削除して追加し直してください。
+              </div>
+              <details className="settings-row" style={{ display: "block", fontSize: 13, lineHeight: 1.7 }}>
+                <summary style={{ cursor: "pointer", fontWeight: 700 }}>iPhone：共有メニューに出す方法（ショートカット）</summary>
+                <div style={{ marginTop: 6, color: "#3d5046" }}>
+                  iPhone では、ホーム画面に追加したアプリを共有メニューに出せないため、「ショートカット」アプリを使います。
+                  <ol style={{ paddingLeft: 20, margin: "6px 0" }}>
+                    <li>「ショートカット」アプリで右上の「＋」</li>
+                    <li>名前を「CookFlowに取り込む」にする</li>
+                    <li>下の「ⓘ」（詳細）で「<b>共有シートに表示</b>」をオン</li>
+                    <li>アクション「<b>テキスト</b>」を追加し、下のアドレスを貼り付けて、その直後に「ショートカットの入力」を挿入</li>
+                    <li>アクション「<b>URLを開く</b>」を追加（入力は上のテキスト）</li>
+                  </ol>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", margin: "6px 0" }}>
+                    <code style={{ flex: 1, minWidth: 0, fontSize: 11, background: "#f3f1ea", borderRadius: 6, padding: "6px 8px", overflowWrap: "anywhere" }}>https://meel-planner.vercel.app/?import=</code>
+                    <button className="btn btn-outline btn-sm" onClick={() => { navigator.clipboard?.writeText("https://meel-planner.vercel.app/?import=").then(() => showToast("アドレスをコピーしました")).catch(() => showToast("長押しでコピーしてください", "warn")) }}>コピー</button>
+                  </div>
+                  共有メニューで「CookFlowに取り込む」を選ぶと、<b>Safari</b> で CookFlow が開いて自動で取り込みます（Safari で一度ログインが必要です）。
+                </div>
+              </details>
+            </div>
+
             <div className="settings-title">🛒 買い物リスト</div>
             <div className="settings-section">
               <div className="settings-row" onClick={() => { const v = !moveChecked; setMoveChecked(v); saveMoveChecked(v) }} style={{ cursor: "pointer" }}>
@@ -1860,7 +1920,7 @@ export default function App() {
       </nav>
 
       {detailRecipe && <RecipeDetailSheet recipe={detailRecipe} tagDefs={tagDefs} onDelete={() => deleteRecipe(detailRecipe.id)} onClose={() => setDetailRecipe(null)} onEdit={detailRecipe ? () => { setEditRecipe(detailRecipe); setShowRegister(true); setDetailRecipe(null) } : null} />}
-      {showRegister && <RegisterSheet recipe={editRecipe} userId={userId} tagDefs={tagDefs} onAddTag={addTag} onSave={saveRecipe} onClose={() => { setShowRegister(false); setEditRecipe(null) }} />}
+      {showRegister && <RegisterSheet recipe={editRecipe} userId={userId} initialImportUrl={editRecipe ? "" : sharedImport} tagDefs={tagDefs} onAddTag={addTag} onSave={saveRecipe} onClose={() => { setShowRegister(false); setEditRecipe(null); setSharedImport("") }} />}
       {editingHistory && <HistoryEditSheet historyItem={editingHistory} recipes={recipes} onSave={updated => {
         const next = history.map(h => h.id === updated.id ? updated : h)
         setHistory(next); triggerSave(buildSave({ history: next })); setEditingHistory(null)
@@ -2169,7 +2229,7 @@ function TagPicker({ tagDefs, value, onChange, onAddTag }) {
   )
 }
 
-function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
+function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose, initialImportUrl }) {
   // _catAuto: カテゴリが自動推論のままか（手動で選んだら false にして以後は上書きしない）
   const blankIng = () => ({ name: "", amount: "", unit: "g", type: "通常食材", category: "野菜・果物", _catAuto: true })
   const blank = { name: "", tags: [], favorite: false, memo: "", url: "", photoPath: null, steps: [""], servings: 2, ingredients: [blankIng()] }
@@ -2235,13 +2295,33 @@ function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
 
   // ── URL・文章から取り込み（レシピサイト・YouTube・貼り付け） ──
   const [importMode, setImportMode] = useState("url") // url | text
+  // 共有・ショートカットから開かれたときは、そのまま取り込みを始める
+  useEffect(() => {
+    if (!initialImportUrl) return
+    setImportUrl(initialImportUrl)
+    runImport(initialImportUrl)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // クリップボードの URL を貼り付けてそのまま取り込む（LINE などで「リンクをコピー」したあと用）
+  const canReadClipboard = typeof navigator !== "undefined" && !!navigator.clipboard?.readText
+  const pasteAndImport = async () => {
+    try {
+      const url = extractUrl(await navigator.clipboard.readText())
+      if (!url) { setImportMsg({ type: "error", text: "コピーした内容にURLが見つかりませんでした。LINEなどで「リンクをコピー」してから押してください" }); return }
+      setImportMode("url"); setImportUrl(url)
+      runImport(url)
+    } catch {
+      setImportMsg({ type: "error", text: "貼り付けを許可してください。うまくいかないときは、上の欄を長押しして「ペースト」してください" })
+    }
+  }
   const [importUrl, setImportUrl] = useState("")
   const [importText, setImportText] = useState("")
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState(null) // { type: "ok" | "warn" | "error", text }
-  const runImport = async () => {
-    const url = importMode === "url" ? importUrl.trim() : ""
-    const text = importMode === "text" ? importText.trim() : ""
+  // overrideUrl：貼り付けボタンや共有から渡された URL（ボタンのクリックイベントは無視）
+  const runImport = async overrideUrl => {
+    const direct = typeof overrideUrl === "string" ? overrideUrl.trim() : ""
+    const url = direct || (importMode === "url" ? importUrl.trim() : "")
+    const text = direct ? "" : importMode === "text" ? importText.trim() : ""
     if ((!url && !text) || importing) return
     const hasContent = form.name || form.ingredients.some(i => i.name) || form.steps.some(s => s.trim())
     if (hasContent && !window.confirm("入力中の料理名・材料・作り方を、取り込んだ内容で置き換えますか？")) return
@@ -2308,7 +2388,10 @@ function RegisterSheet({ recipe, userId, tagDefs, onAddTag, onSave, onClose }) {
                   {/* 文字サイズの設定に関係なく、見た目の大きさを固定（案内文が欠けないように1行を全部使う） */}
                   <input placeholder="レシピサイト・YouTube の URL" value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && runImport()} disabled={importing} inputMode="url" autoCapitalize="none" autoCorrect="off"
                     style={{ width: "100%", fontSize: "calc(13px / var(--zoom, 1))", padding: "calc(9px / var(--zoom, 1)) 10px", background: "#fff" }} />
-                  <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importUrl.trim()} style={{ width: "100%", marginTop: 8, whiteSpace: "nowrap" }}>{importing ? "読み取り中..." : "取り込む"}</button>
+                  {canReadClipboard && !importUrl.trim() && (
+                    <button type="button" className="btn btn-outline btn-sm" onClick={pasteAndImport} disabled={importing} style={{ width: "100%", marginTop: 8, borderColor: "#f3c3a8", color: "#b8542a" }}>📋 コピーしたURLを貼り付けて取り込む</button>
+                  )}
+                  <button className="btn btn-primary btn-sm" onClick={runImport} disabled={importing || !importUrl.trim()} style={{ width: "100%", marginTop: 8, whiteSpace: "nowrap", ...(canReadClipboard && !importUrl.trim() ? { display: "none" } : {}) }}>{importing ? "読み取り中..." : "取り込む"}</button>
                 </>
               ) : (
                 <>

@@ -123,6 +123,20 @@ async function fetchBazurecipeViaApi(url) {
   return null
 }
 
+// バズレシピ：本文に作り方が無いとき（「詳しい作り方は動画で」）は、埋め込み動画の概要欄から作り方を補う
+async function completeBazurecipe(bz) {
+  const { videoId, ...recipe } = bz
+  if (!recipe.steps.length && videoId) {
+    const info = await fetchYouTubeInfo(videoId, process.env.YOUTUBE_API_KEY || process.env.GEMINI_API_KEY)
+    const fromVideo = info.description ? parsePlainRecipe(info.description, info.title, { allowNoSteps: true }) : null
+    if (fromVideo && fromVideo.steps.length) recipe.steps = fromVideo.steps
+  }
+  if (!recipe.steps.length) {
+    recipe.memo = [recipe.memo, `作り方は動画をご覧ください${videoId ? ` https://www.youtube.com/watch?v=${videoId}` : ""}`].filter(Boolean).join(" ")
+  }
+  return recipe
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return }
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {})
@@ -179,7 +193,7 @@ export default async function handler(req, res) {
       // バズレシピ.com はクラウドのサーバーからのページ取得を拒否するので、WordPress の API を試す
       if (/(^|\.)bazurecipe\.com$/.test(host)) {
         const bz = await fetchBazurecipeViaApi(url)
-        if (bz) { res.status(200).json({ recipe: { ...bz, url }, source: "bazurecipe-api" }); return }
+        if (bz) { res.status(200).json({ recipe: { ...(await completeBazurecipe(bz)), url }, source: "bazurecipe-api" }); return }
         throw new Error("バズレシピ.com がこのサーバーからの読み取りを受け付けていません。ページの【材料】【作り方】をコピーして「文章から」に貼ってください（AIなしで読み取れます）")
       }
       throw e
@@ -197,7 +211,7 @@ export default async function handler(req, res) {
     }
     if (/(^|\.)bazurecipe\.com$/.test(new URL(url).hostname)) {
       const bz = extractBazurecipe(html)
-      if (bz) { res.status(200).json({ recipe: { ...bz, url }, source: "bazurecipe" }); return }
+      if (bz) { res.status(200).json({ recipe: { ...(await completeBazurecipe(bz)), url }, source: "bazurecipe" }); return }
     }
     const fromLd = extractJsonLdRecipe(html)
     if (fromLd && fromLd.ingredients.length) {
